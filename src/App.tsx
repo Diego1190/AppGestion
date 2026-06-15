@@ -2,19 +2,15 @@ import React, { useState, useEffect, lazy, Suspense, useCallback } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
-import Layout from '@/components/Layout'
 import { useMobileMenu } from '@/hooks/useMobileMenu'
 import './App.css'
 
-// Lazy loading: cada módulo se carga solo cuando el usuario navega a él
-// Reduce el bundle inicial y acelera el primer render
 const Login         = lazy(() => import('@/pages/Login'))
 const Alquileres    = lazy(() => import('@/pages/Alquileres'))
 const Cotizaciones  = lazy(() => import('@/pages/Cotizaciones'))
 const Finanzas      = lazy(() => import('@/pages/Finanzas'))
 const Configuracion = lazy(() => import('@/pages/Configuracion'))
 
-// Spinner de carga mientras se descarga el módulo
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
     <div className="text-center">
@@ -24,17 +20,15 @@ const PageLoader = () => (
   </div>
 )
 
-// Componente interno que tiene acceso al Router (necesario para useMobileMenu)
 const AppContent: React.FC<{ user: any; onLogout: () => void }> = ({ user, onLogout }) => {
   const { isOpen, open, close } = useMobileMenu()
-
   return (
     <div className="flex min-h-screen bg-gray-100">
       <Sidebar user={user} onLogout={onLogout} isOpen={isOpen} onClose={close} />
       <div className="flex-1 min-w-0">
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/" element={<Navigate to="/alquileres" replace />} />
+            <Route path="/"                element={<Navigate to="/alquileres" replace />} />
             <Route path="/alquileres/*"    element={<Alquileres    onMenuOpen={open} />} />
             <Route path="/cotizaciones/*"  element={<Cotizaciones  onMenuOpen={open} />} />
             <Route path="/finanzas/*"      element={<Finanzas      onMenuOpen={open} />} />
