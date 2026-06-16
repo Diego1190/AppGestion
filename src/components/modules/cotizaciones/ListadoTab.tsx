@@ -1,3 +1,5 @@
+import { uploadPDFToStorage } from '@/lib/supabaseStorage'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
 import { Eye, Download, Trash2, Package, CheckCircle, Clock } from 'lucide-react'
 import { getCotizaciones, deleteCotizacion, getCotizacionDetalles, getCotizacionInsumos, updateInsumo, updateCotizacionEstado } from '@/lib/cotizaciones'
@@ -22,6 +24,7 @@ const ListadoTab: React.FC = () => {
   const { toasts, addToast, removeToast } = useToast()
 
   useEffect(() => { loadData() }, [])
+  useRealtimeSync('cotizaciones', loadData)
 
   const loadData = async () => {
     try { setLoading(true); setCotizaciones(await getCotizaciones()) }
@@ -105,7 +108,7 @@ const ListadoTab: React.FC = () => {
         {filtradas.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No hay cotizaciones. Crea la primera.</div>
         ) : (
-          <div className="overflow-x-auto -mx-1"><table className="w-full min-w-[600px]">
+          <table className="w-full">
             <thead><tr className="bg-gray-50 border-b">
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Correlativo</th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Cliente</th>
@@ -153,7 +156,7 @@ const ListadoTab: React.FC = () => {
                 )
               })}
             </tbody>
-          </table></div>
+          </table>
         )}
       </div>
 
@@ -184,7 +187,7 @@ const ListadoTab: React.FC = () => {
                 </div>
               </div>
 
-              <div className="overflow-x-auto -mx-1"><table className="w-full min-w-[600px] mb-4">
+              <table className="w-full mb-4">
                 <thead><tr className="bg-gray-50 border-b">
                   <th className="text-left px-3 py-2 text-sm font-semibold">Descripción</th>
                   <th className="text-center px-3 py-2 text-sm font-semibold">Cant.</th>
@@ -201,7 +204,7 @@ const ListadoTab: React.FC = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table></div>
+              </table>
 
               <div className="text-right space-y-1 border-t pt-3">
                 <div className="flex justify-end gap-8 text-sm text-gray-600"><span>Total:</span><span className="font-bold text-lg">S/ {modalVer.cot.monto_total.toFixed(2)}</span></div>
@@ -242,7 +245,13 @@ const ListadoTab: React.FC = () => {
                 <CheckCircle className="w-4 h-4"/>
                 {(modalVer.cot.estado||'Activa')==='Completada'?'Reactivar':'Marcar Completada'}
               </button>
-              <button onClick={() => generarPDFCotizacion(modalVer.cot, modalVer.detalles).then(()=>addToast('PDF generado','success')).catch(()=>addToast('Error PDF','error'))}
+              <button onClick={() => generarPDFCotizacion(modalVer.cot, modalVer.detalles).then(async blob => {
+                addToast('PDF generado','success')
+                try {
+                  await uploadPDFToStorage(blob, `cotizacion-${modalVer.cot.correlativo}.pdf`, 'cotizaciones')
+                  addToast('Copia guardada en Supabase','success')
+                } catch(e) { console.error(e) }
+              }).catch(()=>addToast('Error PDF','error'))}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">
                 <Package className="w-4 h-4"/>PDF Cliente
               </button>

@@ -1,7 +1,9 @@
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
 import { Eye, Download, MessageCircle, CheckCircle } from 'lucide-react'
 import { getInquilinos, getMovimientos, updateMovimiento, getHistorialConsumo } from '@/lib/alquileres'
 import { generarPDFRecibo } from '@/lib/pdf'
+import { uploadPDFToStorage } from '@/lib/supabaseStorage'
 import { Inquilino, MovimientoDepa } from '@/types/index'
 import { useToast, ToastContainer } from '@/components/Toast'
 
@@ -14,7 +16,7 @@ const CobranzaTab: React.FC = () => {
   const [reciboModal, setReciboModal] = useState<{ inq: Inquilino; movs: MovimientoDepa[] } | null>(null)
   const [generandoPDF, setGenerandoPDF] = useState<string | null>(null)
   const { toasts, addToast, removeToast } = useToast()
-  const hoy = new Date()
+    const hoy = new Date()
   const [mes, setMes] = useState(hoy.getMonth() + 1)
   const [anio, setAnio] = useState(hoy.getFullYear())
 
@@ -37,7 +39,7 @@ const CobranzaTab: React.FC = () => {
     setGenerandoPDF(inq.id)
     try {
       const historial = await getHistorialConsumo(inq.num_depa)
-      await generarPDFRecibo(
+      const blob = await generarPDFRecibo(
         inq.num_depa, inq.nombre_completo, inq.telefono,
         mes, anio, getMovsInq(inq.num_depa), historial
       )
@@ -100,7 +102,7 @@ const CobranzaTab: React.FC = () => {
         {inquilinos.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No hay inquilinos registrados</div>
         ) : (
-          <div className="overflow-x-auto -mx-1"><table className="w-full min-w-[600px]">
+          <table className="w-full">
             <thead><tr className="bg-gray-50 border-b">
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Depa</th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Inquilino</th>
@@ -141,7 +143,7 @@ const CobranzaTab: React.FC = () => {
                 )
               })}
             </tbody>
-          </table></div>
+          </table>
         )}
       </div>
 
@@ -153,7 +155,7 @@ const CobranzaTab: React.FC = () => {
               <button onClick={() => setReciboModal(null)} className="text-gray-400 text-xl ml-4">✕</button>
             </div>
             <div className="px-6 py-4">
-              <div className="overflow-x-auto -mx-1"><table className="w-full min-w-[600px]">
+              <table className="w-full">
                 <thead><tr className="border-b"><th className="text-left py-2 text-sm font-semibold text-gray-700">Concepto</th><th className="text-left py-2 text-sm font-semibold text-gray-700">Vcto</th><th className="text-right py-2 text-sm font-semibold text-gray-700">Monto</th><th className="text-center py-2 text-sm font-semibold text-gray-700">Estado</th></tr></thead>
                 <tbody>
                   {reciboModal.movs.map(m => (
@@ -166,7 +168,7 @@ const CobranzaTab: React.FC = () => {
                   ))}
                 </tbody>
                 <tfoot><tr className="border-t-2 border-gray-300"><td colSpan={2} className="pt-3 font-bold text-gray-900">TOTAL</td><td className="pt-3 text-right font-bold text-gray-900 text-lg">S/ {reciboModal.movs.reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</td><td></td></tr></tfoot>
-              </table></div>
+              </table>
             </div>
             <div className="px-6 py-4 border-t flex gap-2 justify-end">
               <button onClick={() => setReciboModal(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cerrar</button>

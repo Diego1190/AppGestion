@@ -1,3 +1,4 @@
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
 import { Plus, Zap, Droplets, Home, Wifi, Flame, MoreHorizontal } from 'lucide-react'
 import { getMovimientos, createMovimiento, updateMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
@@ -162,7 +163,7 @@ const MovimientosTab: React.FC = () => {
         {movimientos.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No hay movimientos en {MESES_N[filtroMes-1]} {filtroAnio}</div>
         ) : (
-          <div className="overflow-x-auto -mx-1"><table className="w-full min-w-[600px]">
+          <table className="w-full">
             <thead><tr className="bg-gray-50 border-b">
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Depa / Inquilino</th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Servicio</th>
@@ -203,7 +204,7 @@ const MovimientosTab: React.FC = () => {
                 )
               })}
             </tbody>
-          </table></div>
+          </table>
         )}
       </div>
 
@@ -221,7 +222,7 @@ const MovimientosTab: React.FC = () => {
                 {/* Botones de servicio — más pequeños */}
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Tipo de Servicio</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5">
+                  <div className="grid grid-cols-6 gap-1.5">
                     {SERVICIOS.map(s => {
                       const Icono = ICONOS[s]
                       const active = form.tipo_servicio === s

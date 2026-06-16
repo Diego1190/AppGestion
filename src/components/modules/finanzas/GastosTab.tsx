@@ -1,3 +1,4 @@
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect, useMemo } from 'react'
 import { Plus, Trash2, CheckCircle, Clock } from 'lucide-react'
 import { getGastos, createGasto, updateGasto, deleteGasto } from '@/lib/finanzas'

@@ -1,3 +1,4 @@
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, FileText, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { getInquilinos, createInquilino, deleteInquilino, getContratos, createContrato, updateContrato } from '@/lib/alquileres'
@@ -21,6 +22,7 @@ const InquilinosTab: React.FC = () => {
   const [formCon, setFormCon] = useState({ inquilino_id: '', tipo_contrato: 'Inicial' as 'Inicial' | 'Renovación', fecha_inicio: '', meses_alquiler: 12, importe_alquiler: '' })
 
   useEffect(() => { loadData() }, [])
+  useRealtimeSync(['inquilinos','contratos'], loadData)
 
   const loadData = async () => {
     try {

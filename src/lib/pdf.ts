@@ -78,7 +78,7 @@ interface TxOpts {
 }
 const txt = (doc: jsPDF, text: string, x: number, y: number, o: TxOpts) => {
   doc.setFontSize(o.sz)
-  doc.setFont('helvetica', o.bold ? 'bold' : 'normal')
+  doc.setFont(undefined, o.bold ? 'bold' : 'normal')
   doc.setTextColor(...o.color)
   doc.text(text, x, y, { align: o.align ?? 'left' })
 }
@@ -183,7 +183,7 @@ export const generarPDFRecibo = async (
   mes: number, anio: number,
   movimientos: MovimientoDepa[],
   historial: { mes: number; anio: number; tipo_servicio: string; consumo: number|null; importe_pagar: number }[],
-): Promise<void> => {
+): Promise<Blob> => {
   const cfg = getConfig()
   const doc = new jsPDF()
   const TW  = RX - M
@@ -349,7 +349,9 @@ export const generarPDFRecibo = async (
   }
 
   drawFooter(doc)
-  doc.save(`recibo-dpto${departamento}-${ML[mes-1]}-${anio}.pdf`)
+  const filename = `recibo-dpto${departamento}-${ML[mes-1]}-${anio}.pdf`
+  doc.save(filename)
+  return doc.output('blob') as Blob
 }
 
 // ============================================================
@@ -357,7 +359,7 @@ export const generarPDFRecibo = async (
 // ============================================================
 export const generarPDFCotizacion = async (
   cotizacion: Cotizacion, detalles: CotizacionDetalle[],
-): Promise<void> => {
+): Promise<Blob> => {
   const cfg = getConfig()
   const doc = new jsPDF()
   const TW  = RX - M
@@ -424,7 +426,7 @@ export const generarPDFCotizacion = async (
     if (y > 250) { doc.addPage(); y = 20 }
     if (idx % 2 === 1) fillRect(doc, M, y, TW, 10, C.gray50)
     const desc = doc.splitTextToSize(d.descripcion, 104)
-    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(...C.gray700)
+    doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(...C.gray700)
     doc.text(desc, CC.desc, y+6.5)
     txt(doc, d.cantidad.toFixed(2),   CC.cant,  y+6.5, { sz: 9,   color: C.gray600, align: 'right' })
     txt(doc, mon(d.precio_unitario),  CC.punit, y+6.5, { sz: 9,   color: C.gray600, align: 'right' })
@@ -479,6 +481,7 @@ export const generarPDFCotizacion = async (
 
   drawFooter(doc)
   doc.save(`cotizacion-${cotizacion.correlativo}.pdf`)
+  return doc.output('blob') as Blob
 }
 
 // ============================================================
@@ -486,7 +489,7 @@ export const generarPDFCotizacion = async (
 // ============================================================
 export const generarPDFInsumos = async (
   cotizacion: Cotizacion, insumos: CotizacionInsumo[],
-): Promise<void> => {
+): Promise<Blob> => {
   const doc  = new jsPDF()
   const TW   = RX - M
   const comp = insumos.filter(i => i.comprado).length
@@ -530,4 +533,5 @@ export const generarPDFInsumos = async (
 
   drawFooter(doc)
   doc.save(`insumos-${cotizacion.correlativo}.pdf`)
+  return doc.output('blob') as Blob
 }
