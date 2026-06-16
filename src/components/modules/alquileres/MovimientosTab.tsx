@@ -41,8 +41,6 @@ const MovimientosTab: React.FC = () => {
   const [lecturaAnterior, setLecturaAnterior] = useState<number | null>(null)
   const [cargandoLectura, setCargandoLectura] = useState(false)
 
-  useEffect(() => { loadData() }, [filtroMes, filtroAnio])
-
   const loadData = async () => {
     try {
       setLoading(true)
@@ -53,6 +51,9 @@ const MovimientosTab: React.FC = () => {
     } catch { addToast('Error cargando datos', 'error') }
     finally { setLoading(false) }
   }
+
+  useEffect(() => { loadData() }, [filtroMes, filtroAnio])
+
 
   const depasDisponibles = inquilinos
     .sort((a, b) => a.num_depa - b.num_depa)

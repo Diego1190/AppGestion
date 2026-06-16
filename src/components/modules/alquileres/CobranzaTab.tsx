@@ -20,8 +20,6 @@ const CobranzaTab: React.FC = () => {
   const [mes, setMes] = useState(hoy.getMonth() + 1)
   const [anio, setAnio] = useState(hoy.getFullYear())
 
-  useEffect(() => { loadData() }, [mes, anio])
-
   const loadData = async () => {
     try {
       setLoading(true)
@@ -30,6 +28,9 @@ const CobranzaTab: React.FC = () => {
     } catch { addToast('Error cargando datos', 'error') }
     finally { setLoading(false) }
   }
+
+  useEffect(() => { loadData() }, [mes, anio])
+
 
   const getMovsInq = (n: number) => movimientos.filter(m => m.num_depa === n)
   const getTotal = (n: number) => getMovsInq(n).reduce((s, m) => s + Number(m.importe_pagar), 0)

@@ -23,16 +23,15 @@ const ListadoTab: React.FC = () => {
   const [filtroEstado, setFiltroEstado] = useState<'Todas' | 'Activa' | 'Completada'>('Todas')
   const { toasts, addToast, removeToast } = useToast()
 
-  useEffect(() => { loadData() }, [])
-  // realtime hook después de loadData
-  useRealtimeSync('cotizaciones', loadData)
-
   const loadData = async () => {
     try { setLoading(true); setCotizaciones(await getCotizaciones()) }
     catch { addToast('Error cargando cotizaciones', 'error') }
     finally { setLoading(false) }
   }
 
+  useEffect(() => { loadData() }, [])
+  // realtime hook después de loadData
+  useRealtimeSync('cotizaciones', loadData)
   const abrirVer = async (cot: Cotizacion) => {
     setCargandoModal(true)
     try {
