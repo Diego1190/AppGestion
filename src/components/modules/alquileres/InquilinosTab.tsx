@@ -21,10 +21,6 @@ const InquilinosTab: React.FC = () => {
   const [formInq, setFormInq] = useState({ nombre_completo: '', dni: '', telefono: '', num_depa: '' as number | '' })
   const [formCon, setFormCon] = useState({ inquilino_id: '', tipo_contrato: 'Inicial' as 'Inicial' | 'Renovación', fecha_inicio: '', meses_alquiler: 12, importe_alquiler: '' })
 
-  useEffect(() => { loadData() }, [])
-  // realtime se agrega abajo
-  useRealtimeSync(['inquilinos','contratos'], loadData)'inquilinos','contratos'], loadData)
-
   const loadData = async () => {
     try {
       setLoading(true)
@@ -33,6 +29,9 @@ const InquilinosTab: React.FC = () => {
     } catch { addToast('Error cargando datos', 'error') }
     finally { setLoading(false) }
   }
+
+  useEffect(() => { loadData() }, [])
+  useRealtimeSync(['inquilinos', 'contratos'], loadData)
 
   const contratoActivoPorInquilino = (inqId: string) => contratos.find(c => c.inquilino_id === inqId && c.activo)
   const contratoActivoPorDepa = (numDepa: number) => {
