@@ -22,7 +22,8 @@ const InquilinosTab: React.FC = () => {
   const [formCon, setFormCon] = useState({ inquilino_id: '', tipo_contrato: 'Inicial' as 'Inicial' | 'Renovación', fecha_inicio: '', meses_alquiler: 12, importe_alquiler: '' })
 
   useEffect(() => { loadData() }, [])
-  useRealtimeSync(['inquilinos','contratos'], loadData)
+  // realtime se agrega abajo
+  useRealtimeSync(['inquilinos','contratos'], loadData)'inquilinos','contratos'], loadData)
 
   const loadData = async () => {
     try {

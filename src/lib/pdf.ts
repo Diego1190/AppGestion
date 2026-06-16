@@ -78,7 +78,7 @@ interface TxOpts {
 }
 const txt = (doc: jsPDF, text: string, x: number, y: number, o: TxOpts) => {
   doc.setFontSize(o.sz)
-  doc.setFont(undefined, o.bold ? 'bold' : 'normal')
+  doc.setFont('helvetica', o.bold ? 'bold' : 'normal')
   doc.setTextColor(...o.color)
   doc.text(text, x, y, { align: o.align ?? 'left' })
 }
@@ -426,7 +426,7 @@ export const generarPDFCotizacion = async (
     if (y > 250) { doc.addPage(); y = 20 }
     if (idx % 2 === 1) fillRect(doc, M, y, TW, 10, C.gray50)
     const desc = doc.splitTextToSize(d.descripcion, 104)
-    doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(...C.gray700)
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(...C.gray700)
     doc.text(desc, CC.desc, y+6.5)
     txt(doc, d.cantidad.toFixed(2),   CC.cant,  y+6.5, { sz: 9,   color: C.gray600, align: 'right' })
     txt(doc, mon(d.precio_unitario),  CC.punit, y+6.5, { sz: 9,   color: C.gray600, align: 'right' })

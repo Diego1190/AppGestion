@@ -24,6 +24,7 @@ const ListadoTab: React.FC = () => {
   const { toasts, addToast, removeToast } = useToast()
 
   useEffect(() => { loadData() }, [])
+  // realtime hook después de loadData
   useRealtimeSync('cotizaciones', loadData)
 
   const loadData = async () => {
