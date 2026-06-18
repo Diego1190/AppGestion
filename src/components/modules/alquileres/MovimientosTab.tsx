@@ -164,7 +164,7 @@ const MovimientosTab: React.FC = () => {
         {movimientos.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No hay movimientos en {MESES_N[filtroMes-1]} {filtroAnio}</div>
         ) : (
-          <table className="w-full">
+          <div className="overflow-x-auto"><table className="w-full min-w-[640px]">
             <thead><tr className="bg-gray-50 border-b">
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Depa / Inquilino</th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Servicio</th>
@@ -205,7 +205,7 @@ const MovimientosTab: React.FC = () => {
                 )
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 
@@ -223,7 +223,7 @@ const MovimientosTab: React.FC = () => {
                 {/* Botones de servicio — más pequeños */}
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Tipo de Servicio</label>
-                  <div className="grid grid-cols-6 gap-1.5">
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                     {SERVICIOS.map(s => {
                       const Icono = ICONOS[s]
                       const active = form.tipo_servicio === s
@@ -252,7 +252,7 @@ const MovimientosTab: React.FC = () => {
                 </div>
 
                 {/* Fecha + Importe al mismo nivel */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Vencimiento</label>
                     <input type="date" className={inp} value={form.fecha_vencimiento}

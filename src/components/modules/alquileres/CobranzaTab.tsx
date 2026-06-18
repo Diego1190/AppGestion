@@ -99,11 +99,11 @@ const CobranzaTab: React.FC = () => {
         <div className="bg-green-50 rounded-xl border border-green-200 p-4"><p className="text-sm text-green-700">Cobrado</p><p className="text-2xl font-bold text-green-900">S/ {movimientos.filter(m=>m.estado==='Pagado').reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</p></div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         {inquilinos.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No hay inquilinos registrados</div>
         ) : (
-          <table className="w-full">
+          <table className="w-full min-w-[580px]">
             <thead><tr className="bg-gray-50 border-b">
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Depa</th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Inquilino</th>
@@ -156,7 +156,7 @@ const CobranzaTab: React.FC = () => {
               <button onClick={() => setReciboModal(null)} className="text-gray-400 text-xl ml-4">✕</button>
             </div>
             <div className="px-6 py-4">
-              <table className="w-full">
+              <table className="w-full min-w-[580px]">
                 <thead><tr className="border-b"><th className="text-left py-2 text-sm font-semibold text-gray-700">Concepto</th><th className="text-left py-2 text-sm font-semibold text-gray-700">Vcto</th><th className="text-right py-2 text-sm font-semibold text-gray-700">Monto</th><th className="text-center py-2 text-sm font-semibold text-gray-700">Estado</th></tr></thead>
                 <tbody>
                   {reciboModal.movs.map(m => (

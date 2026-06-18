@@ -3,7 +3,7 @@ import { Plus, Trash2, AlertCircle, TrendingUp, Lock } from 'lucide-react'
 import { getControlVenta, createControlVenta, deleteControlVenta, getTotalPorHermano } from '@/lib/finanzas'
 import { ControlVentaCasa } from '@/types/index'
 
-const TOPE = 6666.66
+const TOPE = 6660
 const TOTAL_VENTA = 20000
 
 type Hermano = 'Gabriel' | 'Fernando' | 'Tu'
@@ -56,7 +56,7 @@ const VentaCasaTab: React.FC = () => {
     setError('')
     if (!formData.entregado_a) { setError('Selecciona un hermano'); return }
     const monto = parseFloat(formData.monto_pagado)
-    if (isNaN(monto) || monto < 200) { setError('El monto mínimo es S/ 200'); return }
+    if (isNaN(monto) || monto < 200) { setError('El monto mínimo es $ 200'); return }
     try {
       // Guardar en Supabase con el valor correcto (Tú con acento para Fernando y Gabriel sin)
       const entregadoReal = formData.entregado_a === 'Tu' ? 'Tú' : formData.entregado_a
@@ -104,11 +104,11 @@ const VentaCasaTab: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="font-semibold text-gray-900">Progreso Total de la Venta</h3>
-            <p className="text-sm text-gray-500">Distribucion de S/ 20,000 total</p>
+            <p className="text-sm text-gray-500">Distribucion de $ 20,000 total</p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-bold text-gray-900">S/ {totalDistribuido.toFixed(2)}</p>
-            <p className="text-sm text-gray-500">de S/ {TOTAL_VENTA.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-gray-900">$ {totalDistribuido.toFixed(2)}</p>
+            <p className="text-sm text-gray-500">de $ {TOTAL_VENTA.toLocaleString()}</p>
           </div>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-3">
@@ -118,7 +118,7 @@ const VentaCasaTab: React.FC = () => {
       </div>
 
       {/* Barras por hermano */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {HERMANOS.map(h => {
           const total = totales[h] || 0
           const pct = Math.min((total / TOPE) * 100, 100)
@@ -134,8 +134,8 @@ const VentaCasaTab: React.FC = () => {
                   </span>
                 )}
               </div>
-              <p className={`text-xl font-bold ${c.text}`}>S/ {total.toFixed(2)}</p>
-              <p className="text-xs text-gray-500 mb-2">de S/ {TOPE.toFixed(2)}</p>
+              <p className={`text-xl font-bold ${c.text}`}>$ {total.toFixed(2)}</p>
+              <p className="text-xs text-gray-500 mb-2">de $ {TOPE.toFixed(2)}</p>
               <div className="w-full bg-white rounded-full h-2">
                 <div className={`${c.bar} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
               </div>
@@ -147,7 +147,7 @@ const VentaCasaTab: React.FC = () => {
 
       {hermanosBloqueados.length > 0 && (
         <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 text-sm">
-          <strong>{hermanosBloqueados.map(h => LABEL[h]).join(' y ')}</strong> ha alcanzado el tope de S/ 6,666.66.
+          <strong>{hermanosBloqueados.map(h => LABEL[h]).join(' y ')}</strong> ha alcanzado el tope de $ 6,660.
         </div>
       )}
 
@@ -191,7 +191,7 @@ const VentaCasaTab: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-gray-900">
-                      S/ {Number(pago.monto_pagado).toFixed(2)}
+                      $ {Number(pago.monto_pagado).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button onClick={() => handleDelete(pago.id)}
@@ -228,7 +228,7 @@ const VentaCasaTab: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Monto (S/) <span className="text-gray-400 font-normal">— mínimo S/ 200</span>
+                    Monto ($) <span className="text-gray-400 font-normal">— mínimo $ 200</span>
                   </label>
                   <input type="number" step="0.01" min="200"
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -255,7 +255,7 @@ const VentaCasaTab: React.FC = () => {
                           }`}>
                           {bloqueado && <Lock className="w-3 h-3 absolute top-1 right-1 text-gray-400" />}
                           <span className="block font-medium text-sm">{LABEL[h]}</span>
-                          <span className="block text-xs text-gray-500 mt-0.5">S/ {disponible.toFixed(0)} disp.</span>
+                          <span className="block text-xs text-gray-500 mt-0.5">$ {disponible.toFixed(0)} disp.</span>
                         </button>
                       )
                     })}

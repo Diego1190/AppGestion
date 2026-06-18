@@ -112,8 +112,8 @@ const InquilinosTab: React.FC = () => {
 
       {/* Modal Cerrar Contrato con motivo */}
       {modalCerrar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
             <div className="px-6 py-4 border-b bg-orange-50 rounded-t-xl">
               <h2 className="text-lg font-semibold text-orange-800">Cerrar Contrato</h2>
               <p className="text-sm text-orange-600 mt-1">Inquilino: <strong>{modalCerrar.inquilinoNombre}</strong></p>
@@ -248,13 +248,13 @@ const InquilinosTab: React.FC = () => {
 
       {/* Modal Inquilino */}
       {modalInq && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
             <div className="px-6 py-4 border-b flex justify-between"><h2 className="text-lg font-semibold">Nuevo Inquilino</h2><button onClick={()=>setModalInq(false)} className="text-gray-400 text-xl">✕</button></div>
             <form onSubmit={handleCrearInq}>
               <div className="px-6 py-4 space-y-4">
                 <div><label className="block text-sm font-medium mb-1">Nombre Completo</label><input type="text" className={`${inp} ${errores.nombre?'border-red-400':''}`} value={formInq.nombre_completo} onChange={e=>setFormInq({...formInq,nombre_completo:e.target.value})}/><FieldError error={errores.nombre}/></div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className="block text-sm font-medium mb-1">DNI <span className="text-gray-400 font-normal">(8 dígitos)</span></label><input type="text" maxLength={8} className={`${inp} ${errores.dni?'border-red-400':''}`} value={formInq.dni} onChange={e=>setFormInq({...formInq,dni:e.target.value.replace(/\D/g,'')})}/><FieldError error={errores.dni}/></div>
                   <div><label className="block text-sm font-medium mb-1">N° Depa</label><input type="number" min={1} className={`${inp} ${errores.num_depa?'border-red-400':''}`} value={formInq.num_depa} onChange={e=>setFormInq({...formInq,num_depa:e.target.value===''?'':parseInt(e.target.value)})}/><FieldError error={errores.num_depa}/></div>
                 </div>
@@ -268,8 +268,8 @@ const InquilinosTab: React.FC = () => {
 
       {/* Modal Contrato */}
       {modalCon && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
             <div className="px-6 py-4 border-b flex justify-between"><h2 className="text-lg font-semibold">Nuevo Contrato</h2><button onClick={()=>setModalCon(false)} className="text-gray-400 text-xl">✕</button></div>
             <form onSubmit={handleCrearCon}>
               <div className="px-6 py-4 space-y-4">
@@ -284,7 +284,7 @@ const InquilinosTab: React.FC = () => {
                     <option value="Inicial">Inicial</option><option value="Renovación">Renovación</option>
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className="block text-sm font-medium mb-1">Fecha Inicio</label><input type="date" className={inp} value={formCon.fecha_inicio} onChange={e=>setFormCon({...formCon,fecha_inicio:e.target.value})} required/></div>
                   <div><label className="block text-sm font-medium mb-1">Meses</label><input type="number" min={1} className={inp} value={formCon.meses_alquiler} onChange={e=>setFormCon({...formCon,meses_alquiler:parseInt(e.target.value)})} required/></div>
                 </div>

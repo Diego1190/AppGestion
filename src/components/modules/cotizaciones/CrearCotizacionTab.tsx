@@ -359,7 +359,7 @@ const CrearCotizacionTab: React.FC = () => {
           <span className="w-5 h-5 bg-blue-100 rounded text-blue-700 flex items-center justify-center text-xs font-bold">1</span>
           Datos del Cliente
         </h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Cliente *</label>
             <input type="text" className={`${inp} ${errores.nombre?'border-red-400':''}`} value={cliente.nombre} onChange={e=>setCliente({...cliente,nombre:e.target.value})} placeholder="Nombre completo"/>
@@ -400,7 +400,7 @@ const CrearCotizacionTab: React.FC = () => {
               <span className="text-sm font-semibold text-indigo-800">🧱 Paredes Drywall</span>
               <span className="text-xs text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded">2 caras = doble placa, misma estructura</span>
             </div>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-3">
               <div><label className="block text-[11px] font-medium mb-1">Largo (m)</label><input type="number" step="0.01" className={inp} value={fPared.largo} onChange={e=>setFPared({...fPared,largo:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Alto (m)</label><input type="number" step="0.01" className={inp} value={fPared.alto} onChange={e=>setFPared({...fPared,alto:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Medida</label><select className={inp} value={fPared.medida} onChange={e=>setFPared({...fPared,medida:e.target.value as MedidaParante})}><option value="38mm">38mm</option><option value="64mm">64mm</option><option value="89mm">89mm</option></select></div>
@@ -416,7 +416,7 @@ const CrearCotizacionTab: React.FC = () => {
         {mTechos && (
           <div className="bg-sky-50 rounded-xl p-4 mb-3 border border-sky-100">
             <span className="text-sm font-semibold text-sky-800 block mb-3">📐 Techos y Coberturas</span>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-3">
               <div><label className="block text-[11px] font-medium mb-1">Ancho (m)</label><input type="number" step="0.01" className={inp} value={fTecho.ancho} onChange={e=>setFTecho({...fTecho,ancho:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Largo (m)</label><input type="number" step="0.01" className={inp} value={fTecho.largo} onChange={e=>setFTecho({...fTecho,largo:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Cobertura</label><select className={inp} value={fTecho.cobertura} onChange={e=>setFTecho({...fTecho,cobertura:e.target.value})}><option>Calamina</option><option>Eternit</option><option>Polipropileno</option></select></div>
@@ -431,7 +431,7 @@ const CrearCotizacionTab: React.FC = () => {
         {mMelamina && (
           <div className="bg-amber-50 rounded-xl p-4 mb-3 border border-amber-100">
             <span className="text-sm font-semibold text-amber-800 block mb-3">🍽️ Melamina / Muebles</span>
-            <div className="grid grid-cols-3 md:grid-cols-4 gap-2 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-3">
               <div><label className="block text-[11px] font-medium mb-1">Planchas</label><input type="number" step="0.25" min="0.25" className={inp} value={fMel.planchas} onChange={e=>setFMel({...fMel,planchas:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Grosor</label><select className={inp} value={fMel.grosor} onChange={e=>setFMel({...fMel,grosor:e.target.value})}><option>15mm</option><option>18mm</option><option>25mm</option></select></div>
               <div><label className="block text-[11px] font-medium mb-1">Acabado</label><select className={inp} value={fMel.acabado} onChange={e=>setFMel({...fMel,acabado:e.target.value})}>{ACABADOS.map(a=><option key={a}>{a}</option>)}</select></div>
@@ -450,7 +450,7 @@ const CrearCotizacionTab: React.FC = () => {
         {mEsp && (
           <div className="bg-purple-50 rounded-xl p-4 mb-3 border border-purple-100">
             <span className="text-sm font-semibold text-purple-800 block mb-3">🔌 Especialidades</span>
-            <div className="grid grid-cols-4 gap-2 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
               <div><label className="block text-[11px] font-medium mb-1">Tipo</label><select className={inp} value={fEsp.tipo} onChange={e=>setFEsp({...fEsp,tipo:e.target.value,m2:'',puntos:''})}><option>Pintura</option><option>Enchape</option><option>Electricidad</option><option>Gasfiteria</option></select></div>
               {(fEsp.tipo==='Pintura'||fEsp.tipo==='Enchape')&&<div><label className="block text-[11px] font-medium mb-1">m2</label><input type="number" step="0.01" className={inp} value={fEsp.m2} onChange={e=>setFEsp({...fEsp,m2:e.target.value})}/></div>}
               {(fEsp.tipo==='Electricidad'||fEsp.tipo==='Gasfiteria')&&<div><label className="block text-[11px] font-medium mb-1">Puntos</label><input type="number" min="1" className={inp} value={fEsp.puntos} onChange={e=>setFEsp({...fEsp,puntos:e.target.value})}/></div>}
@@ -511,7 +511,26 @@ const CrearCotizacionTab: React.FC = () => {
           </div>
         ) : (
           <>
-            <table className="w-full text-sm">
+            {/* MÓVIL: cards de insumos */}
+            <div className="md:hidden space-y-2 mb-4">
+              {insumosAgrupados.map(ins => {
+                const interno = insumos.find(i => i.material_nombre === ins.material_nombre && i.es_manual)
+                return (
+                  <div key={ins.material_nombre} className="flex items-center justify-between bg-gray-50 rounded-xl p-3 border border-gray-200">
+                    <div className="flex-1 min-w-0 mr-3">
+                      <p className="font-medium text-sm text-gray-800 truncate">{ins.material_nombre}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{ins.cantidad.toFixed(2)} {ins.unidad} × S/{ins.precio_unitario.toFixed(2)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="font-semibold text-sm text-gray-900">S/{(ins.cantidad*ins.precio_unitario).toFixed(2)}</span>
+                      <button onClick={()=>eliminarMaterial(ins.material_nombre)} className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5"/></button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {/* DESKTOP: tabla */}
+            <table className="hidden md:table w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase">Material</th>
@@ -572,7 +591,7 @@ const CrearCotizacionTab: React.FC = () => {
                   )
                 })}
               </tbody>
-            </table>
+            </table> {/* fin desktop table */}
 
             {/* Totales */}
             <div className="mt-4 pt-4 border-t border-gray-200 space-y-1.5">
