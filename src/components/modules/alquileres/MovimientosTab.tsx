@@ -1,7 +1,7 @@
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
 import { Plus, Zap, Droplets, Home, Wifi, Flame, MoreHorizontal } from 'lucide-react'
-import { getMovimientos, createMovimiento, updateMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
+import { getMovimientos, createMovimiento, updateMovimiento, updateMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
 import { MovimientoDepa, Inquilino, Contrato } from '@/types/index'
 import { useToast, ToastContainer } from '@/components/Toast'
 
@@ -25,6 +25,7 @@ const MovimientosTab: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const { toasts, addToast, removeToast } = useToast()
+  const [editMov, setEditMov] = useState<MovimientoDepa | null>(null)
   const hoy = new Date()
   const [filtroMes, setFiltroMes] = useState(hoy.getMonth() + 1)
   const [filtroAnio, setFiltroAnio] = useState(hoy.getFullYear())
@@ -128,6 +129,19 @@ const MovimientosTab: React.FC = () => {
   const esLuzAgua = form.tipo_servicio === 'Luz' || form.tipo_servicio === 'Agua'
   const esAlquiler = form.tipo_servicio === 'Alquiler'
   const inp = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+
+  const handleEditMov = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editMov) return
+    try {
+      await updateMovimiento(editMov.id, {
+        estado: editMov.estado,
+        importe_pagar: editMov.importe_pagar,
+        fecha_vencimiento: editMov.fecha_vencimiento,
+      })
+      setEditMov(null); addToast('Movimiento actualizado','success'); loadData()
+    } catch { addToast('Error actualizando','error') }
+  }
 
   if (loading) return <div className="text-center py-12 text-gray-500">Cargando...</div>
 

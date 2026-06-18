@@ -41,7 +41,7 @@ export const getControlVenta = async (): Promise<ControlVentaCasa[]> => {
 export const createControlVenta = async (
   control: Omit<ControlVentaCasa, 'id' | 'mes' | 'anio'>
 ): Promise<ControlVentaCasa> => {
-  if (control.monto_pagado < 200) throw new Error('El monto minimo es $ 200')
+  if (control.monto_pagado < 200) throw new Error('El monto minimo es S/ 200')
 
   const { data: pagosExistentes, error: errPagos } = await supabase
     .from('control_venta_casa')
@@ -53,9 +53,9 @@ export const createControlVenta = async (
   const totalActual = (pagosExistentes || []).reduce((s, p) => s + Number(p.monto_pagado), 0)
   const nuevoTotal = totalActual + control.monto_pagado
 
-  if (nuevoTotal > 6660) {
-    const disponible = (6660 - totalActual).toFixed(2)
-    throw new Error(`Tope excedido. Solo disponible $ ${disponible} para ${control.entregado_a}`)
+  if (nuevoTotal > 6666.66) {
+    const disponible = (6666.66 - totalActual).toFixed(2)
+    throw new Error(`Tope excedido. Solo disponible S/ ${disponible} para ${control.entregado_a}`)
   }
 
   const fecha = new Date(control.fecha_pago)
@@ -70,6 +70,11 @@ export const createControlVenta = async (
 
   if (error) throw new Error(error.message)
   return data
+}
+
+export const updateControlVenta = async (id: string, updates: { monto_pagado?: number; entregado_a?: string; fecha_pago?: string }): Promise<void> => {
+  const { error } = await supabase.from('control_venta_casa').update(updates).eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 export const deleteControlVenta = async (id: string): Promise<void> => {

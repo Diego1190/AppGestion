@@ -42,6 +42,15 @@ const GastosTab: React.FC = () => {
   const totalPagado    = gastosFiltrados.filter(g=>g.estado==='Pagado').reduce((s,g)=>s+g.monto,0)
   const isVencido = (f: string) => new Date(f+'T00:00:00') < new Date()
 
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editItem) return
+    try {
+      await updateGasto(editItem.id, { concepto: editItem.concepto, fecha_vencimiento: editItem.fecha_vencimiento, monto: editItem.monto, estado: editItem.estado })
+      setEditItem(null); addToast('Gasto actualizado','success'); loadGastos()
+    } catch { addToast('Error actualizando','error') }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.monto || parseFloat(form.monto) <= 0) { addToast('Ingresa un monto válido','error'); return }
@@ -140,7 +149,8 @@ const GastosTab: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <div className="flex justify-end mt-2 pt-2 border-t border-gray-100">
+              <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-gray-100">
+                <button onClick={()=>setEditItem({...g})} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                 <button onClick={()=>setConfirmId(g.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
               </div>
             </div>
@@ -179,7 +189,10 @@ const GastosTab: React.FC = () => {
                     </button>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={()=>setConfirmId(g.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={()=>setEditItem({...g})} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                      <button onClick={()=>setConfirmId(g.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                    </div>
                   </td>
                 </tr>
               ))}</tbody>
@@ -224,6 +237,52 @@ const GastosTab: React.FC = () => {
               </div>
               <div className="px-5 py-4 border-t grid grid-cols-2 gap-3">
                 <button type="button" onClick={()=>setShowModal(false)}
+                  className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium text-sm">Cancelar</button>
+                <button type="submit"
+                  className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Editar */}
+      {editItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
+            <div className="px-5 py-4 border-b flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Editar Gasto</h2>
+              <button onClick={()=>setEditItem(null)} className="text-gray-400 text-2xl leading-none">✕</button>
+            </div>
+            <form onSubmit={handleEdit}>
+              <div className="px-5 py-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Concepto</label>
+                  <input type="text" className={inp} value={editItem.concepto}
+                    onChange={e=>setEditItem({...editItem,concepto:e.target.value})} required/>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Fecha Vencimiento</label>
+                    <input type="date" className={inp} value={editItem.fecha_vencimiento}
+                      onChange={e=>setEditItem({...editItem,fecha_vencimiento:e.target.value})} required/>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Monto (S/)</label>
+                    <input type="number" step="0.01" min="0.01" className={inp} value={editItem.monto}
+                      onChange={e=>setEditItem({...editItem,monto:parseFloat(e.target.value)||0})} required/>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Estado</label>
+                  <select className={inp} value={editItem.estado}
+                    onChange={e=>setEditItem({...editItem,estado:e.target.value as any})}>
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Pagado">Pagado</option>
+                  </select>
+                </div>
+              </div>
+              <div className="px-5 py-4 border-t grid grid-cols-2 gap-3">
+                <button type="button" onClick={()=>setEditItem(null)}
                   className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium text-sm">Cancelar</button>
                 <button type="submit"
                   className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm">Guardar</button>

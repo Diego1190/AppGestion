@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, AlertCircle, TrendingUp, Lock } from 'lucide-react'
-import { getControlVenta, createControlVenta, deleteControlVenta, getTotalPorHermano } from '@/lib/finanzas'
+import { getControlVenta, createControlVenta, updateControlVenta, deleteControlVenta, getTotalPorHermano } from '@/lib/finanzas'
 import { ControlVentaCasa } from '@/types/index'
 
 const TOPE = 6660
@@ -20,7 +20,8 @@ const VentaCasaTab: React.FC = () => {
   const [pagos, setPagos] = useState<ControlVentaCasa[]>([])
   const [totales, setTotales] = useState<Record<string, number>>({ Gabriel: 0, Fernando: 0, Tu: 0 })
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
+  const [showModal,  setShowModal]  = useState(false)
+  const [editPago,   setEditPago]   = useState<any | null>(null)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     fecha_pago: '',
@@ -50,6 +51,19 @@ const VentaCasaTab: React.FC = () => {
 
   const hermanosBloqueados = HERMANOS.filter(h => (totales[h] || 0) >= TOPE)
   const hermanosDisponibles = HERMANOS.filter(h => (totales[h] || 0) < TOPE)
+
+  const handleEditPago = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editPago) return
+    try {
+      await updateControlVenta(editPago.id, {
+        monto_pagado: editPago.monto_pagado,
+        entregado_a: editPago.entregado_a,
+        fecha_pago: editPago.fecha_pago,
+      })
+      setEditPago(null); addToast('Pago actualizado','success'); loadData()
+    } catch { addToast('Error actualizando','error') }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -273,6 +287,51 @@ const VentaCasaTab: React.FC = () => {
         </div>
       )}
     </div>
+      {/* Modal Editar Pago */}
+      {editPago && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
+            <div className="px-5 py-4 border-b flex justify-between items-center">
+              <h2 className="text-lg font-semibold">Editar Pago</h2>
+              <button onClick={()=>setEditPago(null)} className="text-gray-400 text-2xl leading-none">✕</button>
+            </div>
+            <form onSubmit={handleEditPago}>
+              <div className="px-5 py-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Para</label>
+                  <select className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    value={editPago.entregado_a}
+                    onChange={e=>setEditPago({...editPago,entregado_a:e.target.value})}>
+                    <option value="Gabriel">Gabriel</option>
+                    <option value="Fernando">Fernando</option>
+                    <option value="Tu">Tú</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Fecha</label>
+                    <input type="date" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      value={editPago.fecha_pago}
+                      onChange={e=>setEditPago({...editPago,fecha_pago:e.target.value})}/>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Monto ($)</label>
+                    <input type="number" step="0.01" min="0" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      value={editPago.monto_pagado}
+                      onChange={e=>setEditPago({...editPago,monto_pagado:parseFloat(e.target.value)||0})}/>
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-4 border-t grid grid-cols-2 gap-3">
+                <button type="button" onClick={()=>setEditPago(null)}
+                  className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium text-sm">Cancelar</button>
+                <button type="submit"
+                  className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
   )
 }
 

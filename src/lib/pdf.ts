@@ -78,7 +78,7 @@ interface TxOpts {
 }
 const txt = (doc: jsPDF, text: string, x: number, y: number, o: TxOpts) => {
   doc.setFontSize(o.sz)
-  doc.setFont('helvetica', o.bold ? 'bold' : 'normal')
+  doc.setFont(undefined, o.bold ? 'bold' : 'normal')
   doc.setTextColor(...o.color)
   doc.text(text, x, y, { align: o.align ?? 'left' })
 }
@@ -183,7 +183,7 @@ export const generarPDFRecibo = async (
   mes: number, anio: number,
   movimientos: MovimientoDepa[],
   historial: { mes: number; anio: number; tipo_servicio: string; consumo: number|null; importe_pagar: number }[],
-): Promise<Blob> => {
+): Promise<void> => {
   const cfg = getConfig()
   const doc = new jsPDF()
   const TW  = RX - M
@@ -222,18 +222,17 @@ export const generarPDFRecibo = async (
   // Label centrado
   txt(doc, 'TOTAL A PAGAR', cardCX, y+8, { sz: 7, color: C.gray500, bold: true, align: 'center' })
 
-  // Monto centrado y grande
-  txt(doc, mon(total), cardCX, y+20, { sz: 18, color: C.blue800, bold: true, align: 'center' })
-
+  // Monto = solo PENDIENTE (lo que falta pagar)
+  // Si todo está pagado muestra 0.00 en verde, si hay pendiente muestra en rojo
   if (pendiente > 0) {
-    // Linea divisora sutil
+    txt(doc, mon(pendiente), cardCX, y+20, { sz: 18, color: C.red600, bold: true, align: 'center' })
     doc.setDrawColor(...C.gray200); doc.setLineWidth(0.2)
     doc.line(cardX+6, y+24, cardX+cW-6, y+24)
-    // Pagado (gris) | Pendiente (rojo) — sin recuadro
-    txt(doc, 'Pagado ' + mon(pagadoAmt),      cardCX-2, y+30, { sz: 7, color: C.gray400, align: 'right' })
-    txt(doc, '  Pendiente ' + mon(pendiente), cardCX+2, y+30, { sz: 7, color: C.red600,  bold: true })
+    txt(doc, 'Total ' + mon(total),      cardCX-2, y+30, { sz: 7, color: C.gray400, align: 'right' })
+    txt(doc, '  Pagado ' + mon(pagadoAmt), cardCX+2, y+30, { sz: 7, color: C.green600, bold: true })
   } else {
-    txt(doc, 'Todo pagado', cardCX, y+26, { sz: 7.5, color: C.green600, bold: true, align: 'center' })
+    txt(doc, mon(0), cardCX, y+20, { sz: 18, color: C.green600, bold: true, align: 'center' })
+    txt(doc, 'Todo pagado', cardCX, y+28, { sz: 7.5, color: C.green600, bold: true, align: 'center' })
   }
 
   // Tabla de movimientos
@@ -349,9 +348,7 @@ export const generarPDFRecibo = async (
   }
 
   drawFooter(doc)
-  const filename = `recibo-dpto${departamento}-${ML[mes-1]}-${anio}.pdf`
-  doc.save(filename)
-  return doc.output('blob') as Blob
+  doc.save(`recibo-dpto${departamento}-${ML[mes-1]}-${anio}.pdf`)
 }
 
 // ============================================================
@@ -359,7 +356,7 @@ export const generarPDFRecibo = async (
 // ============================================================
 export const generarPDFCotizacion = async (
   cotizacion: Cotizacion, detalles: CotizacionDetalle[],
-): Promise<Blob> => {
+): Promise<void> => {
   const cfg = getConfig()
   const doc = new jsPDF()
   const TW  = RX - M
@@ -426,7 +423,7 @@ export const generarPDFCotizacion = async (
     if (y > 250) { doc.addPage(); y = 20 }
     if (idx % 2 === 1) fillRect(doc, M, y, TW, 10, C.gray50)
     const desc = doc.splitTextToSize(d.descripcion, 104)
-    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(...C.gray700)
+    doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(...C.gray700)
     doc.text(desc, CC.desc, y+6.5)
     txt(doc, d.cantidad.toFixed(2),   CC.cant,  y+6.5, { sz: 9,   color: C.gray600, align: 'right' })
     txt(doc, mon(d.precio_unitario),  CC.punit, y+6.5, { sz: 9,   color: C.gray600, align: 'right' })
@@ -481,7 +478,6 @@ export const generarPDFCotizacion = async (
 
   drawFooter(doc)
   doc.save(`cotizacion-${cotizacion.correlativo}.pdf`)
-  return doc.output('blob') as Blob
 }
 
 // ============================================================
@@ -489,7 +485,7 @@ export const generarPDFCotizacion = async (
 // ============================================================
 export const generarPDFInsumos = async (
   cotizacion: Cotizacion, insumos: CotizacionInsumo[],
-): Promise<Blob> => {
+): Promise<void> => {
   const doc  = new jsPDF()
   const TW   = RX - M
   const comp = insumos.filter(i => i.comprado).length
@@ -533,5 +529,4 @@ export const generarPDFInsumos = async (
 
   drawFooter(doc)
   doc.save(`insumos-${cotizacion.correlativo}.pdf`)
-  return doc.output('blob') as Blob
 }
