@@ -183,7 +183,7 @@ export const generarPDFRecibo = async (
   mes: number, anio: number,
   movimientos: MovimientoDepa[],
   historial: { mes: number; anio: number; tipo_servicio: string; consumo: number|null; importe_pagar: number }[],
-): Promise<void> => {
+): Promise<Blob> => {
   const cfg = getConfig()
   const doc = new jsPDF()
   const TW  = RX - M
@@ -349,6 +349,7 @@ export const generarPDFRecibo = async (
 
   drawFooter(doc)
   doc.save(`recibo-dpto${departamento}-${ML[mes-1]}-${anio}.pdf`)
+  return doc.output('blob') as Blob
 }
 
 // ============================================================
@@ -356,7 +357,7 @@ export const generarPDFRecibo = async (
 // ============================================================
 export const generarPDFCotizacion = async (
   cotizacion: Cotizacion, detalles: CotizacionDetalle[],
-): Promise<void> => {
+): Promise<Blob> => {
   const cfg = getConfig()
   const doc = new jsPDF()
   const TW  = RX - M
@@ -478,6 +479,7 @@ export const generarPDFCotizacion = async (
 
   drawFooter(doc)
   doc.save(`cotizacion-${cotizacion.correlativo}.pdf`)
+  return doc.output('blob') as Blob
 }
 
 // ============================================================
@@ -485,7 +487,7 @@ export const generarPDFCotizacion = async (
 // ============================================================
 export const generarPDFInsumos = async (
   cotizacion: Cotizacion, insumos: CotizacionInsumo[],
-): Promise<void> => {
+): Promise<Blob> => {
   const doc  = new jsPDF()
   const TW   = RX - M
   const comp = insumos.filter(i => i.comprado).length
@@ -529,4 +531,5 @@ export const generarPDFInsumos = async (
 
   drawFooter(doc)
   doc.save(`insumos-${cotizacion.correlativo}.pdf`)
+  return doc.output('blob') as Blob
 }

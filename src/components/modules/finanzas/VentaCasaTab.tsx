@@ -61,8 +61,8 @@ const VentaCasaTab: React.FC = () => {
         entregado_a: editPago.entregado_a,
         fecha_pago: editPago.fecha_pago,
       })
-      setEditPago(null); addToast('Pago actualizado','success'); loadData()
-    } catch { addToast('Error actualizando','error') }
+      setEditPago(null); loadData()
+    } catch (e: any) { setError(e.message || 'Error actualizando el pago') }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

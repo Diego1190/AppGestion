@@ -1,7 +1,7 @@
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
 import { Plus, Zap, Droplets, Home, Wifi, Flame, MoreHorizontal } from 'lucide-react'
-import { getMovimientos, createMovimiento, updateMovimiento, updateMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
+import { getMovimientos, createMovimiento, updateMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
 import { MovimientoDepa, Inquilino, Contrato } from '@/types/index'
 import { useToast, ToastContainer } from '@/components/Toast'
 

@@ -12,6 +12,7 @@ const localDate = (f: string) => new Date(f + 'T00:00:00').toLocaleDateString('e
 
 const GastosTab: React.FC = () => {
   const [gastos, setGastos]       = useState<GastoPersonal[]>([])
+  const [editItem, setEditItem]   = useState<GastoPersonal | null>(null)
   const [loading, setLoading]     = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [confirmId, setConfirmId] = useState<string | null>(null)
