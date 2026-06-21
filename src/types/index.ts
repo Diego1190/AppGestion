@@ -16,6 +16,7 @@ export interface Contrato {
   meses_alquiler: number
   fecha_final: string
   importe_alquiler: number
+  garantia: number | null
   activo: boolean
   motivo_cierre?: string
   fecha_cierre?: string
