@@ -236,11 +236,14 @@ export const generarPDFRecibo = async (
   }
 
   // Tabla de movimientos
+  // Columnas reorganizadas para incluir LECTURA (lectura actual del medidor)
+  // CONCEPTO | VENCIMIENTO | LECTURA | CONSUMO | TARIFA | MONTO | ESTADO
   y += cardH + 6
-  const CX = { concept: M+4, vcto: 64, consumo: 119, tarifa: 149, monto: 174, estado: RX }
+  const CX = { concept: M+4, vcto: 50, lectura: 90, consumo: 117, tarifa: 144, monto: 174, estado: RX }
   tableHeader(doc, y, [
     { label: 'CONCEPTO',    x: CX.concept },
-    { label: 'VENCIMIENTO', x: CX.vcto    },
+    { label: 'VENC.',       x: CX.vcto    },
+    { label: 'LECTURA',     x: CX.lectura, align: 'right' },
     { label: 'CONSUMO',     x: CX.consumo, align: 'right' },
     { label: 'TARIFA',      x: CX.tarifa,  align: 'right' },
     { label: 'MONTO',       x: CX.monto,   align: 'right' },
@@ -255,42 +258,43 @@ export const generarPDFRecibo = async (
     if (idx % 2 === 1) fillRect(doc, M, y, TW, rh, C.gray50)
 
     txt(doc, mov.tipo_servicio,          CX.concept, y+6.8, { sz: 9,   color: C.gray700, bold: true })
-    txt(doc, fmt(mov.fecha_vencimiento), CX.vcto,    y+6.8, { sz: 8.5, color: C.gray600 })
+    txt(doc, fmt(mov.fecha_vencimiento), CX.vcto,    y+6.8, { sz: 8,   color: C.gray600 })
+
+    // Lectura actual del medidor (campo lectura_actual del movimiento)
+    if (esM && mov.lectura_actual != null) {
+      txt(doc, Number(mov.lectura_actual).toFixed(2), CX.lectura, y+6.8, { sz: 8, color: C.gray700, align: 'right' })
+    } else {
+      txt(doc, '--', CX.lectura, y+6.8, { sz: 8, color: C.gray400, align: 'right' })
+    }
 
     if (esM && mov.consumo != null) {
       const u = mov.tipo_servicio === 'Luz' ? 'kWh' : 'm3'
-      txt(doc, `${Number(mov.consumo).toFixed(2)} ${u}`, CX.consumo, y+6.8, { sz: 8, color: C.gray700, align: 'right' })
+      txt(doc, `${Number(mov.consumo).toFixed(2)} ${u}`, CX.consumo, y+6.8, { sz: 7.5, color: C.gray700, align: 'right' })
     } else {
       txt(doc, '--', CX.consumo, y+6.8, { sz: 8, color: C.gray400, align: 'right' })
     }
 
     if (esM && mov.tarifa != null) {
-      txt(doc, mon(mov.tarifa), CX.tarifa, y+6.8, { sz: 8, color: C.gray700, align: 'right' })
+      txt(doc, mon(mov.tarifa), CX.tarifa, y+6.8, { sz: 7.5, color: C.gray700, align: 'right' })
     } else {
       txt(doc, '--', CX.tarifa, y+6.8, { sz: 8, color: C.gray400, align: 'right' })
     }
 
-    txt(doc, mon(mov.importe_pagar),          CX.monto,  y+6.8, { sz: 9,   color: C.gray900, bold: true,  align: 'right' })
-    txt(doc, pag ? 'PAGADO' : 'PENDIENTE',    CX.estado, y+6.8, { sz: 7,   color: pag ? C.green600 : C.orange, bold: true, align: 'right' })
+    txt(doc, mon(mov.importe_pagar),          CX.monto,  y+6.8, { sz: 8.5, color: C.gray900, bold: true,  align: 'right' })
+    txt(doc, pag ? 'PAGADO' : 'PENDIENTE',    CX.estado, y+6.8, { sz: 6.5, color: pag ? C.green600 : C.orange, bold: true, align: 'right' })
 
     y += rh; hline(doc, y, C.gray100)
   })
 
   // Fila total — "Total:" right-aligned en CX.tarifa, monto right-aligned en RX
-  // Separacion garantizada: tarifa=149 (fin) vs monto inicio ~166 = 17mm de margen
   fillRect(doc, M, y, TW, 10, C.gray50); hline(doc, y, C.gray200)
   txt(doc, 'Total:', CX.tarifa, y+7, { sz: 8.5, color: C.gray600, bold: true, align: 'right' })
   txt(doc, mon(total), RX,      y+7, { sz: 12,  color: C.blue800, bold: true, align: 'right' })
   hline(doc, y+10, C.gray200); y += 15
 
   // Historial de consumo — 6 meses relativos al recibo
-  // Ej: recibo Enero 2026 → Ago 2025, Sep 2025, Oct 2025, Nov 2025, Dic 2025, Ene 2026
-  //     recibo Junio 2026 → Ene 2026, Feb 2026, Mar 2026, Abr 2026, May 2026, Jun 2026
-  // DEPENDENCIA: getHistorialConsumo en alquileres.ts debe usar order DESCENDING
-  // para retornar los registros mas recientes (ver fix en alquileres.ts)
   const CSERV: Record<string, Color> = { Luz: [234,179,8], Agua: [6,182,212], Gas: [249,115,22] }
 
-  // Calcular los 6 meses objetivo del recibo (el propio mes + 5 anteriores)
   const targets: string[] = []
   for (let i = 5; i >= 0; i--) {
     const d = new Date(anio, mes - 1 - i, 1)
@@ -301,7 +305,6 @@ export const generarPDFRecibo = async (
     return `${MC[parseInt(mo)-1]} ${yr.slice(-2)}`
   })
 
-  // Solo incluir servicios que tienen datos reales en ese periodo
   const serviciosConDatos = ['Luz','Agua','Gas'].filter(s =>
     targets.some(k => {
       const [yr, mo] = k.split('-')
@@ -362,30 +365,24 @@ export const generarPDFCotizacion = async (
   const doc = new jsPDF()
   const TW  = RX - M
 
-  // ── HEADER personalizado (no usa drawHeader generico) ──────
-  // Estructura: titulo + empresa izquierda | N°COTIZACION label arriba + numero abajo
   const headerH = 50
   fillRect(doc, 0, 0, W, headerH, C.teal700)
   doc.setFillColor(...C.teal600); doc.triangle(0, 0, 80, 0, 0, headerH, 'F')
 
-  // Izquierda: titulo, empresa, RUC, telefono
   txt(doc, 'COTIZACION DE SERVICIOS', M, 16, { sz: 19, color: C.white, bold: true })
   let subY = 25
   if (cfg.empresa_nombre)   { txt(doc, cfg.empresa_nombre,              M, subY, { sz: 8.5, color: C.white }); subY += 7 }
   if (cfg.empresa_ruc)      { txt(doc, `RUC: ${cfg.empresa_ruc}`,       M, subY, { sz: 8,   color: C.white }); subY += 7 }
   if (cfg.empresa_telefono) { txt(doc, `Tel: ${cfg.empresa_telefono}`,  M, subY, { sz: 8,   color: C.white }) }
 
-  // Derecha: label "N° COTIZACION" arriba, numero abajo (INTERCAMBIADO)
   txt(doc, 'N COTIZACION',           RX, 18, { sz: 7.5, color: C.teal200, align: 'right' })
   txt(doc, cotizacion.correlativo,   RX, 27, { sz: 13,  color: C.white, bold: true, align: 'right' })
 
-  // Emitida/Vigente debajo del correlativo (dentro del header)
   txt(doc,
     `Emitida: ${fmt(cotizacion.fecha_emision)}   Vigente: ${fmt(cotizacion.fecha_vencimiento)}`,
     RX, 37, { sz: 7.5, color: C.teal200, align: 'right' }
   )
 
-  // ── CARDS CLIENTE / PROYECTO ───────────────────────────────
   let y = headerH + 8
   const cW = Math.floor((TW - 6) / 2)
   const cliLines = [cotizacion.cliente_nombre, cotizacion.cliente_empresa, cotizacion.cliente_telefono].filter(Boolean)
@@ -410,7 +407,6 @@ export const generarPDFCotizacion = async (
 
   y += cardH + 6
 
-  // ── TABLA DETALLES ─────────────────────────────────────────
   const CC = { desc: M+4, cant: 124, punit: 152, total: RX-4 }
   tableHeader(doc, y, [
     { label: 'DESCRIPCION', x: CC.desc },
@@ -433,14 +429,11 @@ export const generarPDFCotizacion = async (
     hline(doc, y+10, C.gray100); y += 10
   })
 
-  // Fila total
   fillRect(doc, M, y, TW, 10, C.gray50); hline(doc, y, C.gray200)
   txt(doc, 'Total:',                    CC.punit-4, y+7, { sz: 8.5, color: C.gray600, bold: true, align: 'right' })
   txt(doc, mon(cotizacion.monto_total), CC.total,   y+7, { sz: 12,  color: C.teal700, bold: true, align: 'right' })
   hline(doc, y+10, C.gray200); y += 16
 
-  // ── SECCIONES INFERIORES: tiempo, condiciones, cuentas ─────
-  // Helper para dibujar un card de seccion
   const drawSectionCard = (
     label: string, lines: string[], accentColor: Color = C.gray700,
   ) => {
@@ -455,18 +448,15 @@ export const generarPDFCotizacion = async (
     y += cardHeight + 5
   }
 
-  // 1. Tiempo estimado (de facilidades_cliente) — PRIMERO
   if (cotizacion.facilidades_cliente?.trim()) {
     drawSectionCard('Tiempo Estimado / Notas', [cotizacion.facilidades_cliente], C.teal700)
   }
 
-  // 2. Condiciones del Servicio — SEGUNDO
   if (cotizacion.condiciones_pago?.trim()) {
     const condLines = cotizacion.condiciones_pago.split('\n').filter(Boolean)
     drawSectionCard('Condiciones del Servicio', condLines, C.gray700)
   }
 
-  // 3. Cuentas bancarias — AL FINAL
   const cuentas = [
     cfg.banco1_numero ? `${cfg.banco1_nombre}: ${cfg.banco1_numero}` : null,
     cfg.banco2_numero ? `${cfg.banco2_nombre}: ${cfg.banco2_numero}` : null,
@@ -522,7 +512,6 @@ export const generarPDFInsumos = async (
     hline(doc, y+10, C.gray100); y += 10
   })
 
-  // Resumen
   y += 6
   fillRect(doc, M, y, TW, 10, C.gray50); hline(doc, y, C.gray200)
   txt(doc, `Total: ${insumos.length} items   Comprados: ${comp}   Pendientes: ${insumos.length - comp}`,

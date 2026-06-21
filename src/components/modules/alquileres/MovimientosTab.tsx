@@ -1,9 +1,9 @@
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
-import { Plus, Zap, Droplets, Home, Wifi, Flame, MoreHorizontal, Pencil } from 'lucide-react'
-import { getMovimientos, createMovimiento, updateMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
+import { Plus, Zap, Droplets, Home, Wifi, Flame, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { getMovimientos, createMovimiento, updateMovimiento, deleteMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
 import { MovimientoDepa, Inquilino, Contrato } from '@/types/index'
-import { useToast, ToastContainer } from '@/components/Toast'
+import { useToast, ToastContainer, ConfirmModal } from '@/components/Toast'
 
 const SERVICIOS = ['Alquiler', 'Luz', 'Agua', 'Internet', 'Gas', 'Otro'] as const
 type Servicio = typeof SERVICIOS[number]
@@ -26,6 +26,7 @@ const MovimientosTab: React.FC = () => {
   const [showModal, setShowModal] = useState(false)
   const { toasts, addToast, removeToast } = useToast()
   const [editMov, setEditMov] = useState<MovimientoDepa | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const hoy = new Date()
   const [filtroMes, setFiltroMes] = useState(hoy.getMonth() + 1)
   const [filtroAnio, setFiltroAnio] = useState(hoy.getFullYear())
@@ -136,6 +137,16 @@ const MovimientosTab: React.FC = () => {
     } catch { addToast('Error actualizando', 'error') }
   }
 
+  const handleDeleteMov = async () => {
+    if (!confirmDeleteId) return
+    try {
+      await deleteMovimiento(confirmDeleteId)
+      setConfirmDeleteId(null)
+      addToast('Movimiento eliminado', 'warning')
+      loadData()
+    } catch { addToast('Error eliminando', 'error') }
+  }
+
   const esLuzAgua = form.tipo_servicio === 'Luz' || form.tipo_servicio === 'Agua'
   const esAlquiler = form.tipo_servicio === 'Alquiler'
   const inp = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
@@ -145,6 +156,14 @@ const MovimientosTab: React.FC = () => {
   return (
     <div>
       <ToastContainer toasts={toasts} onClose={removeToast} />
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        titulo="Eliminar Movimiento"
+        mensaje="¿Eliminar este movimiento? No se puede deshacer."
+        tipo="danger"
+        onConfirm={handleDeleteMov}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
 
       {/* Header filtros — apilado en móvil */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -204,6 +223,9 @@ const MovimientosTab: React.FC = () => {
                     <button onClick={() => setEditMov({ ...mov })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar">
                       <Pencil className="w-4 h-4"/>
                     </button>
+                    <button onClick={() => setConfirmDeleteId(mov.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Eliminar">
+                      <Trash2 className="w-4 h-4"/>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -256,9 +278,14 @@ const MovimientosTab: React.FC = () => {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => setEditMov({ ...mov })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Editar movimiento">
-                        <Pencil className="w-4 h-4"/>
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => setEditMov({ ...mov })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Editar movimiento">
+                          <Pencil className="w-4 h-4"/>
+                        </button>
+                        <button onClick={() => setConfirmDeleteId(mov.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar movimiento">
+                          <Trash2 className="w-4 h-4"/>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
