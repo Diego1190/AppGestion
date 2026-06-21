@@ -240,7 +240,7 @@ export const generarPDFRecibo = async (
   // El estado ya no es columna aparte — va debajo del monto en la misma celda,
   // liberando espacio horizontal para las demas columnas.
   y += cardH + 6
-  const CX = { concept: M+4, vcto: 56, lectura: 100, consumo: 130, tarifa: 158, monto: RX }
+  const CX = { concept: M+4, vcto: 56, lectura: 100, consumo: 130, tarifa: 158, monto: RX-4 }
   tableHeader(doc, y, [
     { label: 'CONCEPTO',    x: CX.concept },
     { label: 'VENC.',       x: CX.vcto    },
@@ -290,7 +290,7 @@ export const generarPDFRecibo = async (
   // Fila total — "Total:" right-aligned en CX.tarifa, monto right-aligned en RX
   fillRect(doc, M, y, TW, 10, C.gray50); hline(doc, y, C.gray200)
   txt(doc, 'Total:', CX.tarifa, y+7, { sz: 8.5, color: C.gray600, bold: true, align: 'right' })
-  txt(doc, mon(total), RX,      y+7, { sz: 12,  color: C.blue800, bold: true, align: 'right' })
+  txt(doc, mon(total), RX-4,    y+7, { sz: 12,  color: C.blue800, bold: true, align: 'right' })
   hline(doc, y+10, C.gray200); y += 15
 
   // Historial de consumo — 6 meses relativos al recibo
