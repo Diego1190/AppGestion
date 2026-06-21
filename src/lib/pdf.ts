@@ -236,10 +236,11 @@ export const generarPDFRecibo = async (
   }
 
   // Tabla de movimientos
-  // Columnas reorganizadas para incluir LECTURA (lectura actual del medidor)
-  // CONCEPTO | VENCIMIENTO | LECTURA | CONSUMO | TARIFA | MONTO | ESTADO
+  // Columnas: CONCEPTO | VENCIMIENTO | LECTURA | CONSUMO | TARIFA | MONTO (con estado debajo)
+  // El estado ya no es columna aparte — va debajo del monto en la misma celda,
+  // liberando espacio horizontal para las demas columnas.
   y += cardH + 6
-  const CX = { concept: M+4, vcto: 50, lectura: 90, consumo: 117, tarifa: 144, monto: 174, estado: RX }
+  const CX = { concept: M+4, vcto: 56, lectura: 100, consumo: 130, tarifa: 158, monto: RX }
   tableHeader(doc, y, [
     { label: 'CONCEPTO',    x: CX.concept },
     { label: 'VENC.',       x: CX.vcto    },
@@ -247,41 +248,41 @@ export const generarPDFRecibo = async (
     { label: 'CONSUMO',     x: CX.consumo, align: 'right' },
     { label: 'TARIFA',      x: CX.tarifa,  align: 'right' },
     { label: 'MONTO',       x: CX.monto,   align: 'right' },
-    { label: 'ESTADO',      x: CX.estado,  align: 'right' },
   ])
   y += 9
 
   movimientos.forEach((mov, idx) => {
-    const rh  = 10
+    const rh  = 13   // +3mm respecto a antes para dar espacio al estado debajo del monto
     const esM = ['Luz','Agua','Gas'].includes(mov.tipo_servicio)
     const pag = mov.estado === 'Pagado'
     if (idx % 2 === 1) fillRect(doc, M, y, TW, rh, C.gray50)
 
-    txt(doc, mov.tipo_servicio,          CX.concept, y+6.8, { sz: 9,   color: C.gray700, bold: true })
-    txt(doc, fmt(mov.fecha_vencimiento), CX.vcto,    y+6.8, { sz: 8,   color: C.gray600 })
+    txt(doc, mov.tipo_servicio,          CX.concept, y+6.5, { sz: 9,   color: C.gray700, bold: true })
+    txt(doc, fmt(mov.fecha_vencimiento), CX.vcto,    y+6.5, { sz: 8,   color: C.gray600 })
 
     // Lectura actual del medidor (campo lectura_actual del movimiento)
     if (esM && mov.lectura_actual != null) {
-      txt(doc, Number(mov.lectura_actual).toFixed(2), CX.lectura, y+6.8, { sz: 8, color: C.gray700, align: 'right' })
+      txt(doc, Number(mov.lectura_actual).toFixed(2), CX.lectura, y+6.5, { sz: 8, color: C.gray700, align: 'right' })
     } else {
-      txt(doc, '--', CX.lectura, y+6.8, { sz: 8, color: C.gray400, align: 'right' })
+      txt(doc, '--', CX.lectura, y+6.5, { sz: 8, color: C.gray400, align: 'right' })
     }
 
     if (esM && mov.consumo != null) {
       const u = mov.tipo_servicio === 'Luz' ? 'kWh' : 'm3'
-      txt(doc, `${Number(mov.consumo).toFixed(2)} ${u}`, CX.consumo, y+6.8, { sz: 7.5, color: C.gray700, align: 'right' })
+      txt(doc, `${Number(mov.consumo).toFixed(2)} ${u}`, CX.consumo, y+6.5, { sz: 7.5, color: C.gray700, align: 'right' })
     } else {
-      txt(doc, '--', CX.consumo, y+6.8, { sz: 8, color: C.gray400, align: 'right' })
+      txt(doc, '--', CX.consumo, y+6.5, { sz: 8, color: C.gray400, align: 'right' })
     }
 
     if (esM && mov.tarifa != null) {
-      txt(doc, mon(mov.tarifa), CX.tarifa, y+6.8, { sz: 7.5, color: C.gray700, align: 'right' })
+      txt(doc, mon(mov.tarifa), CX.tarifa, y+6.5, { sz: 7.5, color: C.gray700, align: 'right' })
     } else {
-      txt(doc, '--', CX.tarifa, y+6.8, { sz: 8, color: C.gray400, align: 'right' })
+      txt(doc, '--', CX.tarifa, y+6.5, { sz: 8, color: C.gray400, align: 'right' })
     }
 
-    txt(doc, mon(mov.importe_pagar),          CX.monto,  y+6.8, { sz: 8.5, color: C.gray900, bold: true,  align: 'right' })
-    txt(doc, pag ? 'PAGADO' : 'PENDIENTE',    CX.estado, y+6.8, { sz: 6.5, color: pag ? C.green600 : C.orange, bold: true, align: 'right' })
+    // Monto arriba, estado debajo (misma columna, alineados a la derecha)
+    txt(doc, mon(mov.importe_pagar),       CX.monto, y+6,   { sz: 9,   color: C.gray900, bold: true, align: 'right' })
+    txt(doc, pag ? 'PAGADO' : 'PENDIENTE', CX.monto, y+10.5,{ sz: 6.5, color: pag ? C.green600 : C.orange, bold: true, align: 'right' })
 
     y += rh; hline(doc, y, C.gray100)
   })
