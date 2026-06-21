@@ -198,9 +198,9 @@ export const generarPDFRecibo = async (
   txt(doc, 'RECIBO DE SERVICIOS', M, 14, { sz: 20, color: C.white, bold: true })
   txt(doc, `${ML[mes-1]} ${anio}`,  M, 24, { sz: 13, color: C.white, bold: true })
   txt(doc, `Emitido: ${fmt(localDateStr())}`, M, 31, { sz: 8, color: C.blue200 })
-  if (cfg.empresa_nombre)   txt(doc, cfg.empresa_nombre,           RX, 15, { sz: 8,   color: C.blue200, align: 'right' })
-  if (cfg.empresa_ruc)      txt(doc, `RUC: ${cfg.empresa_ruc}`,    RX, 22, { sz: 7.5, color: C.blue200, align: 'right' })
-  if (cfg.empresa_telefono) txt(doc, cfg.empresa_telefono,         RX, 29, { sz: 7.5, color: C.blue200, align: 'right' })
+  //if (cfg.empresa_nombre)   txt(doc, cfg.empresa_nombre,           RX, 15, { sz: 8,   color: C.blue200, align: 'right' })
+  //if (cfg.empresa_ruc)      txt(doc, `RUC: ${cfg.empresa_ruc}`,    RX, 22, { sz: 7.5, color: C.blue200, align: 'right' })
+  //if (cfg.empresa_telefono) txt(doc, cfg.empresa_telefono,         RX, 29, { sz: 7.5, color: C.blue200, align: 'right' })
 
   // Cards info
   let y = 44
@@ -210,7 +210,8 @@ export const generarPDFRecibo = async (
   roundRect(doc, M, y, cW, 34, 3, C.blue50, C.blue200)
   txt(doc, 'INQUILINO', M+5, y+7, { sz: 7, color: C.blue800, bold: true })
   txt(doc, inquilino,   M+5, y+15, { sz: 10, color: C.gray900, bold: true })
-  txt(doc, `Depa. ${departamento}${telefono ? ` · Tel: ${telefono}` : ''}`, M+5, y+22, { sz: 8, color: C.gray500 })
+  txt(doc, `Depa. ${departamento}`, M+5, y+22, { sz: 8, color: C.gray500 })
+  txt(doc, `Tel: ${telefono}`, M+5, y+30, { sz: 8, color: C.gray500 })
 
   // Card Total — altura dinamica: mayor cuando hay pendiente
   const cardH  = pendiente > 0 ? 34 : 28
@@ -220,7 +221,7 @@ export const generarPDFRecibo = async (
   roundRect(doc, cardX, y, cW, cardH, 3, C.white, C.gray200)
 
   // Label centrado
-  txt(doc, 'TOTAL A PAGAR', cardCX, y+8, { sz: 7, color: C.gray500, bold: true, align: 'center' })
+  txt(doc, 'TOTAL A PAGAR', cardCX, y+8, { sz: 7, color: C.gray600, bold: true, align: 'center' })
 
   // Monto = solo PENDIENTE (lo que falta pagar)
   // Si todo está pagado muestra 0.00 en verde, si hay pendiente muestra en rojo
@@ -228,7 +229,7 @@ export const generarPDFRecibo = async (
     txt(doc, mon(pendiente), cardCX, y+20, { sz: 18, color: C.red600, bold: true, align: 'center' })
     doc.setDrawColor(...C.gray200); doc.setLineWidth(0.2)
     doc.line(cardX+6, y+24, cardX+cW-6, y+24)
-    txt(doc, 'Total ' + mon(total),      cardCX-2, y+30, { sz: 7, color: C.gray400, align: 'right' })
+    txt(doc, 'Total ' + mon(total),      cardCX-2, y+30, { sz: 7, color: C.gray500, align: 'right' })
     txt(doc, '  Pagado ' + mon(pagadoAmt), cardCX+2, y+30, { sz: 7, color: C.green600, bold: true })
   } else {
     txt(doc, mon(0), cardCX, y+20, { sz: 18, color: C.green600, bold: true, align: 'center' })
@@ -243,7 +244,7 @@ export const generarPDFRecibo = async (
   const CX = { concept: M+4, vcto: 56, lectura: 100, consumo: 130, tarifa: 158, monto: RX-4 }
   tableHeader(doc, y, [
     { label: 'CONCEPTO',    x: CX.concept },
-    { label: 'VENC.',       x: CX.vcto    },
+    { label: 'VENCIMIENTO', x: CX.vcto    },
     { label: 'LECTURA',     x: CX.lectura, align: 'right' },
     { label: 'CONSUMO',     x: CX.consumo, align: 'right' },
     { label: 'TARIFA',      x: CX.tarifa,  align: 'right' },
