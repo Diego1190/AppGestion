@@ -1,6 +1,6 @@
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
-import { Plus, Zap, Droplets, Home, Wifi, Flame, MoreHorizontal } from 'lucide-react'
+import { Plus, Zap, Droplets, Home, Wifi, Flame, MoreHorizontal, Pencil } from 'lucide-react'
 import { getMovimientos, createMovimiento, updateMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
 import { MovimientoDepa, Inquilino, Contrato } from '@/types/index'
 import { useToast, ToastContainer } from '@/components/Toast'
@@ -54,7 +54,7 @@ const MovimientosTab: React.FC = () => {
   }
 
   useEffect(() => { loadData() }, [filtroMes, filtroAnio])
-
+  useRealtimeSync('movimientos_depa', loadData)
 
   const depasDisponibles = inquilinos
     .sort((a, b) => a.num_depa - b.num_depa)
@@ -62,7 +62,6 @@ const MovimientosTab: React.FC = () => {
 
   const getNombre = (n: number) => inquilinos.find(i => i.num_depa === n)?.nombre_completo || `Depa ${n}`
 
-  // Auto importe alquiler
   useEffect(() => {
     if (form.tipo_servicio === 'Alquiler' && form.num_depa !== '') {
       const inq = inquilinos.find(i => i.num_depa === form.num_depa)
@@ -73,7 +72,6 @@ const MovimientosTab: React.FC = () => {
     }
   }, [form.tipo_servicio, form.num_depa, contratos, inquilinos])
 
-  // Auto lectura anterior Luz/Agua
   useEffect(() => {
     if ((form.tipo_servicio === 'Luz' || form.tipo_servicio === 'Agua') && form.fecha_vencimiento && form.num_depa !== '') {
       const fecha = new Date(form.fecha_vencimiento)
@@ -84,7 +82,6 @@ const MovimientosTab: React.FC = () => {
     } else { setLecturaAnterior(null) }
   }, [form.tipo_servicio, form.num_depa, form.fecha_vencimiento])
 
-  // Auto cálculo consumo
   useEffect(() => {
     if ((form.tipo_servicio === 'Luz' || form.tipo_servicio === 'Agua') && lecturaAnterior !== null && form.lectura_actual && form.tarifa) {
       const consumo = parseFloat(form.lectura_actual) - lecturaAnterior
@@ -126,10 +123,6 @@ const MovimientosTab: React.FC = () => {
     } catch { addToast('Error actualizando', 'error') }
   }
 
-  const esLuzAgua = form.tipo_servicio === 'Luz' || form.tipo_servicio === 'Agua'
-  const esAlquiler = form.tipo_servicio === 'Alquiler'
-  const inp = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-
   const handleEditMov = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editMov) return
@@ -139,9 +132,13 @@ const MovimientosTab: React.FC = () => {
         importe_pagar: editMov.importe_pagar,
         fecha_vencimiento: editMov.fecha_vencimiento,
       })
-      setEditMov(null); addToast('Movimiento actualizado','success'); loadData()
-    } catch { addToast('Error actualizando','error') }
+      setEditMov(null); addToast('Movimiento actualizado', 'success'); loadData()
+    } catch { addToast('Error actualizando', 'error') }
   }
+
+  const esLuzAgua = form.tipo_servicio === 'Luz' || form.tipo_servicio === 'Agua'
+  const esAlquiler = form.tipo_servicio === 'Alquiler'
+  const inp = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
 
   if (loading) return <div className="text-center py-12 text-gray-500">Cargando...</div>
 
@@ -149,8 +146,9 @@ const MovimientosTab: React.FC = () => {
     <div>
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      {/* Header filtros — apilado en móvil */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="flex flex-wrap items-center gap-3">
           <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={filtroMes} onChange={e => setFiltroMes(parseInt(e.target.value))}>
             {MESES_N.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
@@ -163,7 +161,7 @@ const MovimientosTab: React.FC = () => {
         </div>
         <button onClick={() => { resetForm(); setShowModal(true) }}
           disabled={depasDisponibles.length === 0}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+          className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors">
           <Plus className="w-4 h-4" /> Nuevo Movimiento
         </button>
       </div>
@@ -174,11 +172,52 @@ const MovimientosTab: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* ── MÓVIL: cards ── */}
+      <div className="md:hidden space-y-2">
+        {movimientos.length === 0
+          ? <div className="bg-white rounded-xl border p-10 text-center text-gray-400">No hay movimientos en {MESES_N[filtroMes-1]} {filtroAnio}</div>
+          : movimientos.map(mov => {
+            const Icono = ICONOS[mov.tipo_servicio as Servicio] || MoreHorizontal
+            return (
+              <div key={mov.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900">Depa {mov.num_depa}</p>
+                    <p className="text-xs text-gray-500 truncate">{getNombre(mov.num_depa)}</p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${COLORES[mov.tipo_servicio as Servicio] || 'bg-gray-100 text-gray-700'}`}>
+                    <Icono className="w-3 h-3"/>{mov.tipo_servicio}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                  <span>{new Date(mov.fecha_vencimiento+'T00:00:00').toLocaleDateString('es-PE')}</span>
+                  {mov.consumo != null && <span>{Number(mov.consumo).toFixed(2)} {mov.tipo_servicio==='Luz'?'kWh':'m³'}</span>}
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                  <span className="font-bold text-gray-900 text-lg">S/ {Number(mov.importe_pagar).toFixed(2)}</span>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => toggleEstado(mov)}>
+                      {mov.estado === 'Pagado'
+                        ? <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">✓ Pagado</span>
+                        : <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">⏳ Pendiente</span>}
+                    </button>
+                    <button onClick={() => setEditMov({ ...mov })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar">
+                      <Pencil className="w-4 h-4"/>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        }
+      </div>
+
+      {/* ── DESKTOP: tabla ── */}
+      <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
         {movimientos.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No hay movimientos en {MESES_N[filtroMes-1]} {filtroAnio}</div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full min-w-[640px]">
+          <div className="overflow-x-auto"><table className="w-full min-w-[700px]">
             <thead><tr className="bg-gray-50 border-b">
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Depa / Inquilino</th>
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Servicio</th>
@@ -186,6 +225,7 @@ const MovimientosTab: React.FC = () => {
               <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Consumo</th>
               <th className="text-right px-4 py-3 text-sm font-semibold text-gray-700">Importe</th>
               <th className="text-center px-4 py-3 text-sm font-semibold text-gray-700">Estado</th>
+              <th className="text-center px-4 py-3 text-sm font-semibold text-gray-700">Acción</th>
             </tr></thead>
             <tbody>
               {movimientos.map(mov => {
@@ -215,6 +255,11 @@ const MovimientosTab: React.FC = () => {
                           : <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">⏳ Pendiente</span>}
                       </button>
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => setEditMov({ ...mov })} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Editar movimiento">
+                        <Pencil className="w-4 h-4"/>
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
@@ -223,18 +268,16 @@ const MovimientosTab: React.FC = () => {
         )}
       </div>
 
-      {/* MODAL REESTRUCTURADO */}
+      {/* MODAL NUEVO MOVIMIENTO */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
             <div className="px-5 py-4 border-b flex justify-between">
               <h2 className="text-base font-semibold">Nuevo Movimiento</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl leading-none">✕</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="px-5 py-4 space-y-4">
-
-                {/* Botones de servicio — más pequeños */}
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Tipo de Servicio</label>
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
@@ -253,7 +296,6 @@ const MovimientosTab: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Depa — ancho completo */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
                   <select className={inp} value={form.num_depa}
@@ -265,7 +307,6 @@ const MovimientosTab: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Fecha + Importe al mismo nivel */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Vencimiento</label>
@@ -284,7 +325,6 @@ const MovimientosTab: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Sección Luz / Agua */}
                 {esLuzAgua && (
                   <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 space-y-2">
                     <p className="text-xs font-semibold text-blue-700 uppercase">Medidor — {form.tipo_servicio}</p>
@@ -313,7 +353,6 @@ const MovimientosTab: React.FC = () => {
                   </div>
                 )}
 
-                {/* Estado */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                   <select className={inp} value={form.estado}
@@ -326,6 +365,54 @@ const MovimientosTab: React.FC = () => {
               <div className="px-5 py-3 border-t flex gap-2 justify-end">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cancelar</button>
                 <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR MOVIMIENTO */}
+      {editMov && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
+            <div className="px-5 py-4 border-b flex justify-between items-center">
+              <h2 className="text-base font-semibold">Editar Movimiento</h2>
+              <button onClick={() => setEditMov(null)} className="text-gray-400 text-xl leading-none">✕</button>
+            </div>
+            <form onSubmit={handleEditMov}>
+              <div className="px-5 py-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Servicio</label>
+                  <p className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-medium">
+                    Depa {editMov.num_depa} — {editMov.tipo_servicio}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Vencimiento</label>
+                    <input type="date" className={inp} value={editMov.fecha_vencimiento}
+                      onChange={e => setEditMov({ ...editMov, fecha_vencimiento: e.target.value })}/>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Importe (S/)</label>
+                    <input type="number" step="0.01" min="0" className={inp} value={editMov.importe_pagar}
+                      onChange={e => setEditMov({ ...editMov, importe_pagar: parseFloat(e.target.value) || 0 })}/>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                  <select className={inp} value={editMov.estado}
+                    onChange={e => setEditMov({ ...editMov, estado: e.target.value as any })}>
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Pagado">Pagado</option>
+                  </select>
+                </div>
+              </div>
+              <div className="px-5 py-4 border-t grid grid-cols-2 gap-3">
+                <button type="button" onClick={() => setEditMov(null)}
+                  className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cancelar</button>
+                <button type="submit"
+                  className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button>
               </div>
             </form>
           </div>

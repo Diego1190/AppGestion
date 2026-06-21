@@ -19,7 +19,7 @@ const InquilinosTab: React.FC = () => {
   const { toasts, addToast, removeToast } = useToast()
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [formInq, setFormInq] = useState({ nombre_completo: '', dni: '', telefono: '', num_depa: '' as number | '' })
-  const [formCon, setFormCon] = useState({ inquilino_id: '', tipo_contrato: 'Inicial' as 'Inicial' | 'Renovación', fecha_inicio: '', meses_alquiler: 12, importe_alquiler: '' })
+  const [formCon, setFormCon] = useState({ inquilino_id: '', tipo_contrato: 'Inicial' as 'Inicial' | 'Renovación', fecha_inicio: '', meses_alquiler: 12, importe_alquiler: '', garantia: '' })
 
   const loadData = async () => {
     try {
@@ -71,15 +71,22 @@ const InquilinosTab: React.FC = () => {
     e.preventDefault()
     if (!formCon.importe_alquiler || parseFloat(formCon.importe_alquiler) <= 0) { addToast('El importe debe ser mayor a 0', 'error'); return }
 
-    // Validar: no permitir nuevo contrato si hay uno activo y no expirado
     const conActivo = contratoActivoPorInquilino(formCon.inquilino_id)
     if (conActivo && !contratoExpirado(conActivo)) {
       addToast(`Este inquilino tiene contrato activo hasta ${new Date(conActivo.fecha_final+'T00:00:00').toLocaleDateString('es-PE')}. Debe completar o cerrar el contrato vigente primero.`, 'error'); return
     }
 
     try {
-      await createContrato({ inquilino_id: formCon.inquilino_id, tipo_contrato: formCon.tipo_contrato, fecha_inicio: formCon.fecha_inicio, meses_alquiler: formCon.meses_alquiler, importe_alquiler: parseFloat(formCon.importe_alquiler), activo: true })
-      setFormCon({ inquilino_id: '', tipo_contrato: 'Inicial', fecha_inicio: '', meses_alquiler: 12, importe_alquiler: '' }); setModalCon(false)
+      await createContrato({
+        inquilino_id: formCon.inquilino_id,
+        tipo_contrato: formCon.tipo_contrato,
+        fecha_inicio: formCon.fecha_inicio,
+        meses_alquiler: formCon.meses_alquiler,
+        importe_alquiler: parseFloat(formCon.importe_alquiler),
+        garantia: formCon.garantia ? parseFloat(formCon.garantia) : null,
+        activo: true,
+      })
+      setFormCon({ inquilino_id: '', tipo_contrato: 'Inicial', fecha_inicio: '', meses_alquiler: 12, importe_alquiler: '', garantia: '' }); setModalCon(false)
       addToast('Contrato creado', 'success'); loadData()
     } catch (err: any) { addToast(err.message || 'Error al crear contrato', 'error') }
   }
@@ -150,7 +157,7 @@ const InquilinosTab: React.FC = () => {
         <p className="text-xs text-blue-700"><strong>Flujo:</strong> El contrato debe completar su período para renovar. Para liberar un depa antes de tiempo, usa "Cerrar Contrato" indicando el motivo. El historial siempre se conserva.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl border p-4"><p className="text-sm text-gray-500">Inquilinos</p><p className="text-2xl font-bold">{inquilinos.length}</p></div>
         <div className="bg-blue-50 rounded-xl border border-blue-200 p-4"><p className="text-sm text-blue-700">Contratos Activos</p><p className="text-2xl font-bold text-blue-900">{contratos.filter(c=>c.activo).length}</p></div>
         <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4"><p className="text-sm text-yellow-700">Por Vencer (30d)</p><p className="text-2xl font-bold text-yellow-900">{contratos.filter(c=>c.activo&&diasRestantes(c.fecha_final)<=30&&diasRestantes(c.fecha_final)>0).length}</p></div>
@@ -173,17 +180,33 @@ const InquilinosTab: React.FC = () => {
           const expirado = activo ? contratoExpirado(activo) : false
           return (
             <div key={inq.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-4 flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-4">
+              {/* MÓVIL: layout vertical apilado / DESKTOP: una fila */}
+              <div className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                {/* Bloque identidad */}
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">D{inq.num_depa}</div>
-                  <div>
-                    <p className="font-semibold text-gray-900">{inq.nombre_completo}</p>
-                    <p className="text-sm text-gray-500">DNI: {inq.dni} · Tel: {inq.telefono}</p>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{inq.nombre_completo}</p>
+                    <p className="text-sm text-gray-500 truncate">DNI: {inq.dni} · Tel: {inq.telefono}</p>
                   </div>
                 </div>
+
+                {/* Bloque centro: garantía — visible cuando hay contrato activo */}
+                {activo && (
+                  <div className="flex sm:flex-1 sm:justify-center">
+                    <div className="text-center bg-gray-50 rounded-lg px-3 py-1.5 border border-gray-100">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wide leading-none">Garantía</p>
+                      <p className="text-sm font-semibold text-gray-700">
+                        {activo.garantia != null ? `S/ ${activo.garantia.toFixed(2)}` : '—'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Bloque acciones */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {activo ? (
-                    <div className="text-right mr-2">
+                    <div className="text-right mr-1">
                       <p className="text-sm font-semibold text-gray-900">S/ {activo.importe_alquiler.toFixed(2)}/mes</p>
                       <p className={`text-xs ${expirado?'text-red-600 font-bold':dias!<=30?'text-orange-600 font-medium':'text-gray-500'}`}>
                         Vence: {new Date(activo.fecha_final+'T00:00:00').toLocaleDateString('es-PE')}
@@ -220,15 +243,16 @@ const InquilinosTab: React.FC = () => {
               </div>
 
               {abierto && (
-                <div className="border-t bg-gray-50 px-5 py-3">
+                <div className="border-t bg-gray-50 px-4 sm:px-5 py-3">
                   <p className="text-xs font-semibold text-gray-500 uppercase mb-3">Historial ({hist.length})</p>
                   {hist.length === 0 ? <p className="text-sm text-gray-400">Sin contratos</p> : (
                     <div className="space-y-2">
                       {hist.map(c => (
-                        <div key={c.id} className="flex items-center justify-between bg-white rounded-lg px-4 py-2 border border-gray-200">
+                        <div key={c.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white rounded-lg px-4 py-2 border border-gray-200">
                           <div className="flex items-center gap-3 flex-wrap">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.tipo_contrato==='Inicial'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'}`}>{c.tipo_contrato}</span>
                             <span className="text-sm text-gray-700">{new Date(c.fecha_inicio+'T00:00:00').toLocaleDateString('es-PE')} → {new Date(c.fecha_final+'T00:00:00').toLocaleDateString('es-PE')} ({c.meses_alquiler}m)</span>
+                            {c.garantia != null && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">Garantía: S/ {c.garantia.toFixed(2)}</span>}
                             {c.motivo_cierre && <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">Cierre: {c.motivo_cierre}</span>}
                           </div>
                           <div className="flex items-center gap-2">
@@ -266,7 +290,7 @@ const InquilinosTab: React.FC = () => {
         </div>
       )}
 
-      {/* Modal Contrato */}
+      {/* Modal Contrato — con campo Garantía */}
       {modalCon && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
@@ -288,7 +312,10 @@ const InquilinosTab: React.FC = () => {
                   <div><label className="block text-sm font-medium mb-1">Fecha Inicio</label><input type="date" className={inp} value={formCon.fecha_inicio} onChange={e=>setFormCon({...formCon,fecha_inicio:e.target.value})} required/></div>
                   <div><label className="block text-sm font-medium mb-1">Meses</label><input type="number" min={1} className={inp} value={formCon.meses_alquiler} onChange={e=>setFormCon({...formCon,meses_alquiler:parseInt(e.target.value)})} required/></div>
                 </div>
-                <div><label className="block text-sm font-medium mb-1">Importe Mensual (S/)</label><input type="number" step="0.01" min="0.01" className={inp} placeholder="0.00" value={formCon.importe_alquiler} onChange={e=>setFormCon({...formCon,importe_alquiler:e.target.value})} required/></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div><label className="block text-sm font-medium mb-1">Importe Mensual (S/)</label><input type="number" step="0.01" min="0.01" className={inp} placeholder="0.00" value={formCon.importe_alquiler} onChange={e=>setFormCon({...formCon,importe_alquiler:e.target.value})} required/></div>
+                  <div><label className="block text-sm font-medium mb-1">Garantía (S/) <span className="text-gray-400 font-normal">opcional</span></label><input type="number" step="0.01" min="0" className={inp} placeholder="0.00" value={formCon.garantia} onChange={e=>setFormCon({...formCon,garantia:e.target.value})}/></div>
+                </div>
               </div>
               <div className="px-6 py-4 border-t flex gap-2 justify-end"><button type="button" onClick={()=>setModalCon(false)} className="px-4 py-2 bg-gray-100 rounded-lg font-medium text-sm">Cancelar</button><button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button></div>
             </form>
