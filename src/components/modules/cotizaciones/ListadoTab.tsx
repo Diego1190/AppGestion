@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Eye, Trash2, Package, CheckCircle, FileText } from 'lucide-react'
+import { Eye, Trash2, Package, CheckCircle, FileText, MessageCircle, Loader2 } from 'lucide-react'
 import { getCotizaciones, deleteCotizacion, getCotizacionDetalles, getCotizacionInsumos, updateInsumo, updateCotizacionEstado } from '@/lib/cotizaciones'
 import { generarPDFCotizacion, generarPDFInsumos } from '@/lib/pdf'
 import { uploadPDFToStorage } from '@/lib/supabaseStorage'
@@ -13,6 +13,7 @@ const ListadoTab: React.FC = () => {
   const [confirmId, setConfirmId]       = useState<string | null>(null)
   const [modalVer, setModalVer]         = useState<{cot:Cotizacion;detalles:CotizacionDetalle[];insumos:CotizacionInsumo[]}|null>(null)
   const [cargando, setCargando]         = useState(false)
+  const [enviandoWA, setEnviandoWA]     = useState<string | null>(null)
   const [filtroEstado, setFiltroEstado] = useState<'Todas'|'Activa'|'Completada'>('Todas')
   const { toasts, addToast, removeToast } = useToast()
 
@@ -51,14 +52,25 @@ const ListadoTab: React.FC = () => {
     catch { addToast('Error','error') }
   }
 
+  /**
+   * Genera el PDF de cotizacion, lo descarga local y lo sube a Storage.
+   * Retorna la URL firmada (o null si la subida falla — el PDF local ya se descargo igual).
+   */
+  const generarYSubirPDFCotizacion = async (cot: Cotizacion, detalles: CotizacionDetalle[]): Promise<string | null> => {
+    const blob = await generarPDFCotizacion(cot, detalles)
+    try {
+      return await uploadPDFToStorage(blob, `cotizacion-${cot.correlativo}.pdf`, 'cotizaciones')
+    } catch (e) {
+      console.error('Error subiendo a Storage:', e)
+      return null
+    }
+  }
+
   /** PDF de la cotización (para el cliente) — descarga local + respaldo en Storage */
   const handlePDFCotizacion = async (cot: Cotizacion, detalles: CotizacionDetalle[]) => {
     try {
-      const blob = await generarPDFCotizacion(cot, detalles)
-      addToast('PDF generado','success')
-      try {
-        await uploadPDFToStorage(blob, `cotizacion-${cot.correlativo}.pdf`, 'cotizaciones')
-      } catch (e) { console.error(e) }
+      const url = await generarYSubirPDFCotizacion(cot, detalles)
+      addToast(url ? 'PDF generado y guardado en la nube' : 'PDF generado (no se pudo respaldar en la nube)', url ? 'success' : 'warning')
     } catch { addToast('Error generando PDF','error') }
   }
 
@@ -77,6 +89,44 @@ const ListadoTab: React.FC = () => {
       const insumos = await getCotizacionInsumos(cot.id)
       await handlePDFInsumos(cot, insumos)
     } catch { addToast('Error cargando insumos','error') }
+  }
+
+  /**
+   * Genera el PDF de cotizacion, lo sube a Storage, y abre WhatsApp
+   * con el resumen de la cotizacion + el link de descarga del PDF.
+   */
+  const enviarPorWhatsApp = async (cot: Cotizacion, detalles: CotizacionDetalle[]) => {
+    if (!cot.cliente_telefono) { addToast('Esta cotización no tiene teléfono de cliente registrado','error'); return }
+    setEnviandoWA(cot.id)
+    try {
+      const url = await generarYSubirPDFCotizacion(cot, detalles)
+
+      const tel = cot.cliente_telefono.replace(/\D/g, '')
+      const lineaPdf = url ? `\n📄 Descarga tu cotización en PDF aquí:\n${url}\n` : ''
+
+      const msg = encodeURIComponent(
+        `Estimado/a ${cot.cliente_nombre.split(' ')[0]}, le envío la cotización *${cot.correlativo}*` +
+        `${cot.proyecto_nombre ? ` para *${cot.proyecto_nombre}*` : ''}:\n\n` +
+        `💰 Total: *S/ ${cot.monto_total.toFixed(2)}*\n` +
+        lineaPdf +
+        `\nQuedo atento/a a cualquier consulta. Gracias 🙏`
+      )
+      window.open(`https://wa.me/51${tel}?text=${msg}`, '_blank')
+
+      if (!url) addToast('Mensaje enviado, pero no se pudo adjuntar el link del PDF', 'warning')
+    } catch {
+      addToast('Error preparando el envío', 'error')
+    } finally {
+      setEnviandoWA(null)
+    }
+  }
+
+  /** Para los botones de la lista, donde aun no tenemos los detalles cargados */
+  const enviarPorWhatsAppDesdeListado = async (cot: Cotizacion) => {
+    try {
+      const detalles = await getCotizacionDetalles(cot.id)
+      await enviarPorWhatsApp(cot, detalles)
+    } catch { addToast('Error cargando detalle','error') }
   }
 
   const isVigente = (f: string) => new Date(f) >= new Date()
@@ -117,6 +167,7 @@ const ListadoTab: React.FC = () => {
           : filtradas.map(cot => {
             const estado = cot.estado || 'Activa'
             const vigente = isVigente(cot.fecha_vencimiento)
+            const enviando = enviandoWA === cot.id
             return (
               <div key={cot.id} className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-start justify-between gap-2 mb-3">
@@ -138,6 +189,9 @@ const ListadoTab: React.FC = () => {
                   </span>
                   <button onClick={()=>abrirVer(cot)} disabled={cargando} title="Ver detalle" className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-4 h-4"/></button>
                   <button onClick={()=>handlePDFInsumosDesdeListado(cot)} title="PDF de insumos" className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg"><Package className="w-4 h-4"/></button>
+                  <button onClick={()=>enviarPorWhatsAppDesdeListado(cot)} disabled={enviando} title="Enviar por WhatsApp" className="p-2 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-40">
+                    {enviando ? <Loader2 className="w-4 h-4 animate-spin"/> : <MessageCircle className="w-4 h-4"/>}
+                  </button>
                   <button onClick={()=>handleMarcarCompletada(cot)} title="Marcar completada" className={`p-2 rounded-lg ${estado==='Completada'?'text-gray-400 hover:bg-gray-100':'text-green-600 hover:bg-green-50'}`}><CheckCircle className="w-4 h-4"/></button>
                   <button onClick={()=>setConfirmId(cot.id)} title="Eliminar" className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
                 </div>
@@ -164,6 +218,7 @@ const ListadoTab: React.FC = () => {
               <tbody>{filtradas.map(cot=>{
                 const estado = cot.estado||'Activa'
                 const vigente = isVigente(cot.fecha_vencimiento)
+                const enviando = enviandoWA === cot.id
                 return (
                   <tr key={cot.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-sm font-medium text-blue-700">{cot.correlativo}</td>
@@ -182,6 +237,9 @@ const ListadoTab: React.FC = () => {
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={()=>abrirVer(cot)} disabled={cargando} title="Ver detalle" className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-4 h-4"/></button>
                         <button onClick={()=>handlePDFInsumosDesdeListado(cot)} title="PDF de insumos" className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg"><Package className="w-4 h-4"/></button>
+                        <button onClick={()=>enviarPorWhatsAppDesdeListado(cot)} disabled={enviando} title="Enviar por WhatsApp" className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-40">
+                          {enviando ? <Loader2 className="w-4 h-4 animate-spin"/> : <MessageCircle className="w-4 h-4"/>}
+                        </button>
                         <button onClick={()=>handleMarcarCompletada(cot)} title="Marcar completada" className={`p-1.5 rounded-lg ${estado==='Completada'?'text-gray-400 hover:bg-gray-100':'text-green-600 hover:bg-green-50'}`}><CheckCircle className="w-4 h-4"/></button>
                         <button onClick={()=>setConfirmId(cot.id)} title="Eliminar" className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
                       </div>
@@ -234,9 +292,9 @@ const ListadoTab: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="px-5 py-4 border-t sticky bottom-0 bg-white grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+            <div className="px-5 py-4 border-t sticky bottom-0 bg-white grid grid-cols-2 gap-2 sm:gap-3">
               <button onClick={()=>handleMarcarCompletada(modalVer.cot)}
-                className={`py-2.5 rounded-xl font-medium text-sm col-span-2 sm:col-span-1 ${(modalVer.cot.estado||'Activa')==='Completada'?'bg-gray-100 text-gray-700':'bg-green-600 hover:bg-green-700 text-white'}`}>
+                className={`py-2.5 rounded-xl font-medium text-sm ${(modalVer.cot.estado||'Activa')==='Completada'?'bg-gray-100 text-gray-700':'bg-green-600 hover:bg-green-700 text-white'}`}>
                 {(modalVer.cot.estado||'Activa')==='Completada'?'Reactivar':'Completada'}
               </button>
               <button onClick={()=>handlePDFCotizacion(modalVer.cot, modalVer.detalles)}
@@ -246,6 +304,11 @@ const ListadoTab: React.FC = () => {
               <button onClick={()=>handlePDFInsumos(modalVer.cot, modalVer.insumos)}
                 className="py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2">
                 <Package className="w-4 h-4"/>PDF Insumos
+              </button>
+              <button onClick={()=>enviarPorWhatsApp(modalVer.cot, modalVer.detalles)} disabled={enviandoWA===modalVer.cot.id}
+                className="py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2">
+                {enviandoWA===modalVer.cot.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <MessageCircle className="w-4 h-4"/>}
+                WhatsApp
               </button>
             </div>
           </div>
