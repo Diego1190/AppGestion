@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabase'
 
 const BUCKET = 'pdfs'
 
+/** Duracion del link firmado: 7 dias (en segundos) */
+const SIGNED_URL_EXPIRY = 60 * 60 * 24 * 7
+
 /**
  * Sube un PDF a Supabase Storage en la carpeta correspondiente.
  * Bucket: pdfs (privado)
@@ -23,10 +26,10 @@ export const uploadPDFToStorage = async (
 
   if (error) throw new Error(`Error guardando PDF: ${error.message}`)
 
-  // URL firmada válida por 1 hora (privado)
+  // URL firmada válida por 7 días (privado)
   const { data } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(path, 3600)
+    .createSignedUrl(path, SIGNED_URL_EXPIRY)
 
   return data?.signedUrl ?? ''
 }

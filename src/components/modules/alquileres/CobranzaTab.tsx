@@ -1,6 +1,6 @@
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import React, { useState, useEffect } from 'react'
-import { Eye, Download, MessageCircle, CheckCircle } from 'lucide-react'
+import { Eye, Download, MessageCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { getInquilinos, getMovimientos, updateMovimiento, getHistorialConsumo } from '@/lib/alquileres'
 import { generarPDFRecibo } from '@/lib/pdf'
 import { uploadPDFToStorage } from '@/lib/supabaseStorage'
@@ -9,14 +9,19 @@ import { useToast, ToastContainer } from '@/components/Toast'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
+/** Nombre de archivo consistente — usado tanto al subir a Storage como al generar el PDF local */
+const nombreArchivo = (numDepa: number, mes: number, anio: number) =>
+  `recibo-dpto${numDepa}-${MESES[mes - 1]}-${anio}.pdf`
+
 const CobranzaTab: React.FC = () => {
   const [inquilinos, setInquilinos] = useState<Inquilino[]>([])
   const [movimientos, setMovimientos] = useState<MovimientoDepa[]>([])
   const [loading, setLoading] = useState(true)
   const [reciboModal, setReciboModal] = useState<{ inq: Inquilino; movs: MovimientoDepa[] } | null>(null)
   const [generandoPDF, setGenerandoPDF] = useState<string | null>(null)
+  const [enviandoWA, setEnviandoWA] = useState<string | null>(null)
   const { toasts, addToast, removeToast } = useToast()
-    const hoy = new Date()
+  const hoy = new Date()
   const [mes, setMes] = useState(hoy.getMonth() + 1)
   const [anio, setAnio] = useState(hoy.getFullYear())
 
@@ -30,37 +35,76 @@ const CobranzaTab: React.FC = () => {
   }
 
   useEffect(() => { loadData() }, [mes, anio])
-
+  useRealtimeSync('movimientos_depa', loadData)
 
   const getMovsInq = (n: number) => movimientos.filter(m => m.num_depa === n)
   const getTotal = (n: number) => getMovsInq(n).reduce((s, m) => s + Number(m.importe_pagar), 0)
   const getPendiente = (n: number) => getMovsInq(n).filter(m => m.estado === 'Pendiente').reduce((s, m) => s + Number(m.importe_pagar), 0)
 
+  /**
+   * Genera el PDF, lo descarga localmente Y lo sube a Supabase Storage.
+   * Retorna la URL firmada del Storage (o null si la subida falla,
+   * en cuyo caso el PDF local ya se descargó igual).
+   */
+  const generarYSubirPDF = async (inq: Inquilino): Promise<string | null> => {
+    const historial = await getHistorialConsumo(inq.num_depa)
+    const blob = await generarPDFRecibo(
+      inq.num_depa, inq.nombre_completo, inq.telefono,
+      mes, anio, getMovsInq(inq.num_depa), historial
+    )
+    try {
+      const filename = nombreArchivo(inq.num_depa, mes, anio)
+      const url = await uploadPDFToStorage(blob, filename, 'recibos')
+      return url || null
+    } catch (err) {
+      console.error('Error subiendo a Storage:', err)
+      return null   // el PDF local ya se descargó vía generarPDFRecibo, no se pierde el trabajo
+    }
+  }
+
   const handlePDF = async (inq: Inquilino) => {
     setGenerandoPDF(inq.id)
     try {
-      const historial = await getHistorialConsumo(inq.num_depa)
-      const blob = await generarPDFRecibo(
-        inq.num_depa, inq.nombre_completo, inq.telefono,
-        mes, anio, getMovsInq(inq.num_depa), historial
-      )
-      addToast('PDF generado correctamente', 'success')
+      const url = await generarYSubirPDF(inq)
+      addToast(url ? 'PDF generado y guardado en la nube' : 'PDF generado (no se pudo respaldar en la nube)', url ? 'success' : 'warning')
     } catch { addToast('Error generando PDF', 'error') }
     finally { setGenerandoPDF(null) }
   }
 
-  const abrirWhatsApp = (inq: Inquilino, total: number, pendiente: number) => {
-    const tel = inq.telefono.replace(/\D/g, '')
-    const detalle = getMovsInq(inq.num_depa).map(m =>
-      `• ${m.tipo_servicio}: S/ ${Number(m.importe_pagar).toFixed(2)}${m.consumo ? ` (${Number(m.consumo).toFixed(2)} ${m.tipo_servicio==='Luz'?'kWh':'m³'})` : ''}`
-    ).join('\n')
-    const msg = encodeURIComponent(
-      `Estimado/a ${inq.nombre_completo.split(' ')[0]}, le envío el resumen de *${MESES[mes-1]} ${anio}*:\n\n` +
-      `🏠 *Depa ${inq.num_depa}*\n${detalle}\n\n` +
-      `💰 Total: *S/ ${total.toFixed(2)}*\n` +
-      `${pendiente > 0 ? `⏳ Pendiente: *S/ ${pendiente.toFixed(2)}*` : '✅ Todo pagado'}\n\nGracias 🙏`
-    )
-    window.open(`https://wa.me/51${tel}?text=${msg}`, '_blank')
+  /**
+   * Genera el PDF (si aún no existe una copia reciente), lo sube a Storage,
+   * y abre WhatsApp con el resumen + enlace de descarga del recibo.
+   */
+  const enviarPorWhatsApp = async (inq: Inquilino) => {
+    setEnviandoWA(inq.id)
+    try {
+      const total = getTotal(inq.num_depa)
+      const pendiente = getPendiente(inq.num_depa)
+      const url = await generarYSubirPDF(inq)
+
+      const tel = inq.telefono.replace(/\D/g, '')
+      const detalle = getMovsInq(inq.num_depa).map(m =>
+        `• ${m.tipo_servicio}: S/ ${Number(m.importe_pagar).toFixed(2)}${m.consumo ? ` (${Number(m.consumo).toFixed(2)} ${m.tipo_servicio==='Luz'?'kWh':'m³'})` : ''}`
+      ).join('\n')
+
+      const lineaPdf = url ? `\n📄 Descarga tu recibo PDF aquí:\n${url}\n` : ''
+
+      const msg = encodeURIComponent(
+        `Estimado/a ${inq.nombre_completo.split(' ')[0]}, le envío el resumen de *${MESES[mes-1]} ${anio}*:\n\n` +
+        `🏠 *Depa ${inq.num_depa}*\n${detalle}\n\n` +
+        `💰 Total: *S/ ${total.toFixed(2)}*\n` +
+        `${pendiente > 0 ? `⏳ Pendiente: *S/ ${pendiente.toFixed(2)}*` : '✅ Todo pagado'}\n` +
+        lineaPdf +
+        `\nGracias 🙏`
+      )
+      window.open(`https://wa.me/51${tel}?text=${msg}`, '_blank')
+
+      if (!url) addToast('Mensaje enviado, pero no se pudo adjuntar el link del PDF', 'warning')
+    } catch {
+      addToast('Error preparando el envío', 'error')
+    } finally {
+      setEnviandoWA(null)
+    }
   }
 
   const toggleEstado = async (mov: MovimientoDepa) => {
@@ -81,7 +125,7 @@ const CobranzaTab: React.FC = () => {
     <div>
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <select className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           value={mes} onChange={e => setMes(parseInt(e.target.value))}>
           {MESES.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
@@ -90,16 +134,82 @@ const CobranzaTab: React.FC = () => {
           value={anio} onChange={e => setAnio(parseInt(e.target.value))}>
           {[2023,2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        <span className="text-sm text-gray-500 ml-2">Panel — {MESES[mes-1]} {anio}</span>
+        <span className="text-sm text-gray-500">Panel — {MESES[mes-1]} {anio}</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl border p-4"><p className="text-sm text-gray-500">Total Facturado</p><p className="text-2xl font-bold">S/ {movimientos.reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</p></div>
-        <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4"><p className="text-sm text-yellow-700">Pendiente</p><p className="text-2xl font-bold text-yellow-900">S/ {movimientos.filter(m=>m.estado==='Pendiente').reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</p></div>
-        <div className="bg-green-50 rounded-xl border border-green-200 p-4"><p className="text-sm text-green-700">Cobrado</p><p className="text-2xl font-bold text-green-900">S/ {movimientos.filter(m=>m.estado==='Pagado').reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</p></div>
+      {/* Cards resumen — apiladas en móvil */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <div className="bg-white rounded-xl border p-4">
+          <p className="text-sm text-gray-500">Total Facturado</p>
+          <p className="text-xl sm:text-2xl font-bold">S/ {movimientos.reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</p>
+        </div>
+        <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-4">
+          <p className="text-sm text-yellow-700">Pendiente</p>
+          <p className="text-xl sm:text-2xl font-bold text-yellow-900">S/ {movimientos.filter(m=>m.estado==='Pendiente').reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</p>
+        </div>
+        <div className="bg-green-50 rounded-xl border border-green-200 p-4">
+          <p className="text-sm text-green-700">Cobrado</p>
+          <p className="text-xl sm:text-2xl font-bold text-green-900">S/ {movimientos.filter(m=>m.estado==='Pagado').reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</p>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      {/* ── MÓVIL: cards de inquilino ── */}
+      <div className="md:hidden space-y-3">
+        {inquilinos.length === 0 ? (
+          <div className="bg-white rounded-xl border p-10 text-center text-gray-400">No hay inquilinos registrados</div>
+        ) : inquilinos.map(inq => {
+          const movs = getMovsInq(inq.num_depa)
+          const total = getTotal(inq.num_depa)
+          const pendiente = getPendiente(inq.num_depa)
+          const todoPagado = movs.length > 0 && movs.every(m => m.estado === 'Pagado')
+          const generando = generandoPDF === inq.id
+          const enviando = enviandoWA === inq.id
+          return (
+            <div key={inq.id} className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">D{inq.num_depa}</div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">{inq.nombre_completo}</p>
+                    <p className="text-xs text-gray-500">{inq.telefono}</p>
+                  </div>
+                </div>
+                {movs.length > 0 && (
+                  todoPagado
+                    ? <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs flex-shrink-0"><CheckCircle className="w-3 h-3"/>Al día</span>
+                    : <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs flex-shrink-0">⏳ Pendiente</span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-sm mb-3">
+                <span className="text-gray-500">{movs.length === 0 ? 'Sin servicios' : `${movs.length} servicio${movs.length!==1?'s':''}`}</span>
+                <div className="text-right">
+                  <span className="font-bold text-gray-900">{total>0?`S/ ${total.toFixed(2)}`:'—'}</span>
+                  {pendiente > 0 && <span className="ml-2 text-red-600 font-medium">(S/ {pendiente.toFixed(2)} pend.)</span>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
+                <button onClick={() => setReciboModal({ inq, movs })} disabled={movs.length===0}
+                  className="flex items-center justify-center gap-1.5 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg disabled:opacity-30 text-xs font-medium">
+                  <Eye className="w-4 h-4"/>Ver
+                </button>
+                <button onClick={() => handlePDF(inq)} disabled={movs.length===0 || generando}
+                  className="flex items-center justify-center gap-1.5 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-30 text-xs font-medium">
+                  {generando ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}PDF
+                </button>
+                <button onClick={() => enviarPorWhatsApp(inq)} disabled={movs.length===0 || enviando}
+                  className="flex items-center justify-center gap-1.5 py-2 text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-30 text-xs font-medium">
+                  {enviando ? <Loader2 className="w-4 h-4 animate-spin"/> : <MessageCircle className="w-4 h-4"/>}Enviar
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── DESKTOP: tabla ── */}
+      <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
         {inquilinos.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No hay inquilinos registrados</div>
         ) : (
@@ -119,6 +229,8 @@ const CobranzaTab: React.FC = () => {
                 const total = getTotal(inq.num_depa)
                 const pendiente = getPendiente(inq.num_depa)
                 const todoPagado = movs.length > 0 && movs.every(m => m.estado === 'Pagado')
+                const generando = generandoPDF === inq.id
+                const enviando = enviandoWA === inq.id
                 return (
                   <tr key={inq.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3"><div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">D{inq.num_depa}</div></td>
@@ -134,10 +246,12 @@ const CobranzaTab: React.FC = () => {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => setReciboModal({ inq, movs })} title="Ver Recibo" disabled={movs.length===0} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-30"><Eye className="w-4 h-4"/></button>
-                        <button onClick={() => handlePDF(inq)} title="PDF" disabled={movs.length===0||generandoPDF===inq.id} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-30">
-                          {generandoPDF===inq.id ? <span className="text-xs">...</span> : <Download className="w-4 h-4"/>}
+                        <button onClick={() => handlePDF(inq)} title="Descargar y respaldar PDF" disabled={movs.length===0||generando} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-30">
+                          {generando ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}
                         </button>
-                        <button onClick={() => abrirWhatsApp(inq,total,pendiente)} title="WhatsApp" disabled={movs.length===0} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-30"><MessageCircle className="w-4 h-4"/></button>
+                        <button onClick={() => enviarPorWhatsApp(inq)} title="Enviar por WhatsApp con link de PDF" disabled={movs.length===0||enviando} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-30">
+                          {enviando ? <Loader2 className="w-4 h-4 animate-spin"/> : <MessageCircle className="w-4 h-4"/>}
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -148,16 +262,25 @@ const CobranzaTab: React.FC = () => {
         )}
       </div>
 
+      {/* Modal Ver Recibo */}
       {reciboModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b flex justify-between items-start">
-              <div><h2 className="text-lg font-semibold">Recibo — {MESES[mes-1]} {anio}</h2><p className="text-sm text-gray-500">Depa {reciboModal.inq.num_depa} · {reciboModal.inq.nombre_completo}</p></div>
-              <button onClick={() => setReciboModal(null)} className="text-gray-400 text-xl ml-4">✕</button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="px-5 sm:px-6 py-4 border-b flex justify-between items-start sticky top-0 bg-white">
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold">Recibo — {MESES[mes-1]} {anio}</h2>
+                <p className="text-sm text-gray-500">Depa {reciboModal.inq.num_depa} · {reciboModal.inq.nombre_completo}</p>
+              </div>
+              <button onClick={() => setReciboModal(null)} className="text-gray-400 text-xl ml-4 flex-shrink-0">✕</button>
             </div>
-            <div className="px-6 py-4">
-              <table className="w-full min-w-[580px]">
-                <thead><tr className="border-b"><th className="text-left py-2 text-sm font-semibold text-gray-700">Concepto</th><th className="text-left py-2 text-sm font-semibold text-gray-700">Vcto</th><th className="text-right py-2 text-sm font-semibold text-gray-700">Monto</th><th className="text-center py-2 text-sm font-semibold text-gray-700">Estado</th></tr></thead>
+            <div className="px-5 sm:px-6 py-4 overflow-x-auto">
+              <table className="w-full min-w-[480px]">
+                <thead><tr className="border-b">
+                  <th className="text-left py-2 text-sm font-semibold text-gray-700">Concepto</th>
+                  <th className="text-left py-2 text-sm font-semibold text-gray-700">Vcto</th>
+                  <th className="text-right py-2 text-sm font-semibold text-gray-700">Monto</th>
+                  <th className="text-center py-2 text-sm font-semibold text-gray-700">Estado</th>
+                </tr></thead>
                 <tbody>
                   {reciboModal.movs.map(m => (
                     <tr key={m.id} className="border-b border-gray-100">
@@ -168,18 +291,24 @@ const CobranzaTab: React.FC = () => {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot><tr className="border-t-2 border-gray-300"><td colSpan={2} className="pt-3 font-bold text-gray-900">TOTAL</td><td className="pt-3 text-right font-bold text-gray-900 text-lg">S/ {reciboModal.movs.reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</td><td></td></tr></tfoot>
+                <tfoot><tr className="border-t-2 border-gray-300">
+                  <td colSpan={2} className="pt-3 font-bold text-gray-900">TOTAL</td>
+                  <td className="pt-3 text-right font-bold text-gray-900 text-lg">S/ {reciboModal.movs.reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</td>
+                  <td></td>
+                </tr></tfoot>
               </table>
             </div>
-            <div className="px-6 py-4 border-t flex gap-2 justify-end">
-              <button onClick={() => setReciboModal(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cerrar</button>
+            <div className="px-5 sm:px-6 py-4 border-t flex flex-col sm:flex-row gap-2 sm:justify-end sticky bottom-0 bg-white">
+              <button onClick={() => setReciboModal(null)} className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm order-3 sm:order-1">Cerrar</button>
               <button onClick={() => handlePDF(reciboModal.inq)} disabled={generandoPDF===reciboModal.inq.id}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium text-sm">
-                <Download className="w-4 h-4"/>{generandoPDF===reciboModal.inq.id?'Generando...':'PDF'}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium text-sm order-2">
+                {generandoPDF===reciboModal.inq.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}
+                {generandoPDF===reciboModal.inq.id?'Generando...':'PDF'}
               </button>
-              <button onClick={() => { abrirWhatsApp(reciboModal.inq,getTotal(reciboModal.inq.num_depa),getPendiente(reciboModal.inq.num_depa)); setReciboModal(null) }}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm">
-                <MessageCircle className="w-4 h-4"/>WhatsApp
+              <button onClick={() => enviarPorWhatsApp(reciboModal.inq)} disabled={enviandoWA===reciboModal.inq.id}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium text-sm order-1 sm:order-3">
+                {enviandoWA===reciboModal.inq.id ? <Loader2 className="w-4 h-4 animate-spin"/> : <MessageCircle className="w-4 h-4"/>}
+                WhatsApp
               </button>
             </div>
           </div>

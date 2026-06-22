@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Trash2, AlertCircle, TrendingUp, Lock } from 'lucide-react'
+import { Plus, Trash2, AlertCircle, TrendingUp, Lock, Pencil } from 'lucide-react'
 import { getControlVenta, createControlVenta, updateControlVenta, deleteControlVenta, getTotalPorHermano } from '@/lib/finanzas'
 import { ControlVentaCasa } from '@/types/index'
 
@@ -31,8 +31,6 @@ const VentaCasaTab: React.FC = () => {
 
   const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
-  useEffect(() => { loadData() }, [])
-
   const loadData = async () => {
     try {
       setLoading(true)
@@ -48,6 +46,8 @@ const VentaCasaTab: React.FC = () => {
       setLoading(false)
     }
   }
+
+  useEffect(() => { loadData() }, [])
 
   const hermanosBloqueados = HERMANOS.filter(h => (totales[h] || 0) >= TOPE)
   const hermanosDisponibles = HERMANOS.filter(h => (totales[h] || 0) < TOPE)
@@ -72,7 +72,6 @@ const VentaCasaTab: React.FC = () => {
     const monto = parseFloat(formData.monto_pagado)
     if (isNaN(monto) || monto < 200) { setError('El monto mínimo es $ 200'); return }
     try {
-      // Guardar en Supabase con el valor correcto (Tú con acento para Fernando y Gabriel sin)
       const entregadoReal = formData.entregado_a === 'Tu' ? 'Tú' : formData.entregado_a
       await createControlVenta({
         fecha_pago: formData.fecha_pago,
@@ -114,14 +113,14 @@ const VentaCasaTab: React.FC = () => {
       )}
 
       {/* Progreso general */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
           <div>
             <h3 className="font-semibold text-gray-900">Progreso Total de la Venta</h3>
             <p className="text-sm text-gray-500">Distribucion de $ 20,000 total</p>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-gray-900">$ {totalDistribuido.toFixed(2)}</p>
+          <div className="sm:text-right">
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">$ {totalDistribuido.toFixed(2)}</p>
             <p className="text-sm text-gray-500">de $ {TOTAL_VENTA.toLocaleString()}</p>
           </div>
         </div>
@@ -168,13 +167,49 @@ const VentaCasaTab: React.FC = () => {
       <div className="flex justify-end mb-4">
         <button onClick={() => { setError(''); setShowModal(true) }}
           disabled={hermanosDisponibles.length === 0}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2.5 rounded-lg font-medium transition-colors">
           <Plus className="w-4 h-4" /> Registrar Pago
         </button>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* ── MÓVIL: cards ── */}
+      <div className="md:hidden space-y-2">
+        {pagos.length === 0
+          ? <div className="bg-white rounded-xl border p-10 text-center text-gray-400">No hay pagos registrados</div>
+          : pagos.map(pago => {
+            const hKey = getHermanoKey(pago.entregado_a)
+            const c = COLORES[hKey] || COLORES.Gabriel
+            return (
+              <div key={pago.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${c.badge}`}>
+                      <TrendingUp className="w-3 h-3" />{pago.entregado_a}
+                    </span>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {new Date(pago.fecha_pago + 'T00:00:00').toLocaleDateString('es-PE')}
+                      {pago.mes && <span className="ml-2">· {MESES[pago.mes - 1]} {pago.anio}</span>}
+                    </p>
+                  </div>
+                  <span className="font-bold text-gray-900 text-lg flex-shrink-0">$ {Number(pago.monto_pagado).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                  <button onClick={() => setEditPago({ ...pago, fecha_pago: pago.fecha_pago || new Date().toISOString().split('T')[0] })}
+                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete(pago.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Eliminar">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )
+          })
+        }
+      </div>
+
+      {/* ── DESKTOP: tabla ── */}
+      <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
         {pagos.length === 0 ? (
           <div className="text-center py-12 text-gray-400">No hay pagos registrados</div>
         ) : (
@@ -211,10 +246,7 @@ const VentaCasaTab: React.FC = () => {
                       <div className="flex items-center justify-center gap-1">
                         <button onClick={() => setEditPago({ ...pago, fecha_pago: pago.fecha_pago || new Date().toISOString().split('T')[0] })}
                           className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                          </svg>
+                          <Pencil className="w-4 h-4" />
                         </button>
                         <button onClick={() => handleDelete(pago.id)}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -230,22 +262,22 @@ const VentaCasaTab: React.FC = () => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal Registrar Pago */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-            <div className="px-6 py-4 border-b flex justify-between">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-md">
+            <div className="px-5 sm:px-6 py-4 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold">Registrar Pago</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl">✕</button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="px-6 py-4 space-y-4">
+              <div className="px-5 sm:px-6 py-4 space-y-4">
                 {error && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
                 )}
                 <div>
                   <label className="block text-sm font-medium mb-1">Fecha de Pago</label>
-                  <input type="date" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  <input type="date" className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
                     value={formData.fecha_pago}
                     onChange={e => setFormData({...formData, fecha_pago: e.target.value})} required />
                 </div>
@@ -254,7 +286,7 @@ const VentaCasaTab: React.FC = () => {
                     Monto ($) <span className="text-gray-400 font-normal">— mínimo $ 200</span>
                   </label>
                   <input type="number" step="0.01" min="200"
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
                     placeholder="200.00"
                     value={formData.monto_pagado}
                     onChange={e => setFormData({...formData, monto_pagado: e.target.value})} required />
@@ -285,11 +317,11 @@ const VentaCasaTab: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div className="px-6 py-4 border-t flex gap-2 justify-end">
+              <div className="px-5 sm:px-6 py-4 border-t grid grid-cols-2 gap-3">
                 <button type="button" onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Cancelar</button>
+                  className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cancelar</button>
                 <button type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Guardar</button>
+                  className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button>
               </div>
             </form>
           </div>

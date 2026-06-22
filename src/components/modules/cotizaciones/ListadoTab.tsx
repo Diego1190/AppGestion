@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Eye, Download, Trash2, Package, CheckCircle, Clock } from 'lucide-react'
+import { Eye, Trash2, Package, CheckCircle, FileText } from 'lucide-react'
 import { getCotizaciones, deleteCotizacion, getCotizacionDetalles, getCotizacionInsumos, updateInsumo, updateCotizacionEstado } from '@/lib/cotizaciones'
 import { generarPDFCotizacion, generarPDFInsumos } from '@/lib/pdf'
 import { uploadPDFToStorage } from '@/lib/supabaseStorage'
@@ -51,15 +51,32 @@ const ListadoTab: React.FC = () => {
     catch { addToast('Error','error') }
   }
 
-  const handlePDF = async (cot: Cotizacion, detalles: CotizacionDetalle[]) => {
+  /** PDF de la cotización (para el cliente) — descarga local + respaldo en Storage */
+  const handlePDFCotizacion = async (cot: Cotizacion, detalles: CotizacionDetalle[]) => {
     try {
       const blob = await generarPDFCotizacion(cot, detalles)
       addToast('PDF generado','success')
       try {
         await uploadPDFToStorage(blob, `cotizacion-${cot.correlativo}.pdf`, 'cotizaciones')
-        addToast('Guardado en Supabase','success')
-      } catch(e) { console.error(e) }
-    } catch { addToast('Error PDF','error') }
+      } catch (e) { console.error(e) }
+    } catch { addToast('Error generando PDF','error') }
+  }
+
+  /** PDF de la lista de materiales/insumos (para compras) */
+  const handlePDFInsumos = async (cot: Cotizacion, insumos: CotizacionInsumo[]) => {
+    if (insumos.length === 0) { addToast('Esta cotización no tiene insumos registrados','warning'); return }
+    try {
+      await generarPDFInsumos(cot, insumos)
+      addToast('PDF de insumos generado','success')
+    } catch { addToast('Error generando PDF de insumos','error') }
+  }
+
+  /** Para los botones de la lista, donde solo tenemos la cotización (sin detalles/insumos cargados aun) */
+  const handlePDFInsumosDesdeListado = async (cot: Cotizacion) => {
+    try {
+      const insumos = await getCotizacionInsumos(cot.id)
+      await handlePDFInsumos(cot, insumos)
+    } catch { addToast('Error cargando insumos','error') }
   }
 
   const isVigente = (f: string) => new Date(f) >= new Date()
@@ -115,13 +132,14 @@ const ListadoTab: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100">
                   <span className={`flex-1 text-xs px-2 py-1 rounded-full font-medium text-center ${estado==='Completada'?'bg-green-100 text-green-700':'bg-blue-100 text-blue-700'}`}>
                     {estado}
                   </span>
-                  <button onClick={()=>abrirVer(cot)} disabled={cargando} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-4 h-4"/></button>
-                  <button onClick={()=>handleMarcarCompletada(cot)} className={`p-2 rounded-lg ${estado==='Completada'?'text-gray-400 hover:bg-gray-100':'text-green-600 hover:bg-green-50'}`}><CheckCircle className="w-4 h-4"/></button>
-                  <button onClick={()=>setConfirmId(cot.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                  <button onClick={()=>abrirVer(cot)} disabled={cargando} title="Ver detalle" className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-4 h-4"/></button>
+                  <button onClick={()=>handlePDFInsumosDesdeListado(cot)} title="PDF de insumos" className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg"><Package className="w-4 h-4"/></button>
+                  <button onClick={()=>handleMarcarCompletada(cot)} title="Marcar completada" className={`p-2 rounded-lg ${estado==='Completada'?'text-gray-400 hover:bg-gray-100':'text-green-600 hover:bg-green-50'}`}><CheckCircle className="w-4 h-4"/></button>
+                  <button onClick={()=>setConfirmId(cot.id)} title="Eliminar" className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
                 </div>
               </div>
             )
@@ -162,9 +180,10 @@ const ListadoTab: React.FC = () => {
                     <td className="px-4 py-3 text-right font-bold text-gray-900">S/ {cot.monto_total.toFixed(2)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={()=>abrirVer(cot)} disabled={cargando} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-4 h-4"/></button>
-                        <button onClick={()=>handleMarcarCompletada(cot)} className={`p-1.5 rounded-lg ${estado==='Completada'?'text-gray-400 hover:bg-gray-100':'text-green-600 hover:bg-green-50'}`}><CheckCircle className="w-4 h-4"/></button>
-                        <button onClick={()=>setConfirmId(cot.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                        <button onClick={()=>abrirVer(cot)} disabled={cargando} title="Ver detalle" className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-4 h-4"/></button>
+                        <button onClick={()=>handlePDFInsumosDesdeListado(cot)} title="PDF de insumos" className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg"><Package className="w-4 h-4"/></button>
+                        <button onClick={()=>handleMarcarCompletada(cot)} title="Marcar completada" className={`p-1.5 rounded-lg ${estado==='Completada'?'text-gray-400 hover:bg-gray-100':'text-green-600 hover:bg-green-50'}`}><CheckCircle className="w-4 h-4"/></button>
+                        <button onClick={()=>setConfirmId(cot.id)} title="Eliminar" className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
                       </div>
                     </td>
                   </tr>
@@ -197,7 +216,7 @@ const ListadoTab: React.FC = () => {
               ))}
               {modalVer.insumos.length > 0 && (
                 <div className="mt-3 pt-3 border-t">
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Insumos</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Insumos ({modalVer.insumos.length})</p>
                   <div className="space-y-1.5">
                     {modalVer.insumos.map(ins=>(
                       <div key={ins.id} onClick={()=>toggleComprado(ins)}
@@ -215,14 +234,18 @@ const ListadoTab: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="px-5 py-4 border-t sticky bottom-0 bg-white grid grid-cols-2 gap-3">
+            <div className="px-5 py-4 border-t sticky bottom-0 bg-white grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
               <button onClick={()=>handleMarcarCompletada(modalVer.cot)}
-                className={`py-2.5 rounded-xl font-medium text-sm ${(modalVer.cot.estado||'Activa')==='Completada'?'bg-gray-100 text-gray-700':'bg-green-600 hover:bg-green-700 text-white'}`}>
+                className={`py-2.5 rounded-xl font-medium text-sm col-span-2 sm:col-span-1 ${(modalVer.cot.estado||'Activa')==='Completada'?'bg-gray-100 text-gray-700':'bg-green-600 hover:bg-green-700 text-white'}`}>
                 {(modalVer.cot.estado||'Activa')==='Completada'?'Reactivar':'Completada'}
               </button>
-              <button onClick={()=>handlePDF(modalVer.cot, modalVer.detalles)}
+              <button onClick={()=>handlePDFCotizacion(modalVer.cot, modalVer.detalles)}
                 className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2">
-                <Package className="w-4 h-4"/>PDF
+                <FileText className="w-4 h-4"/>PDF Cliente
+              </button>
+              <button onClick={()=>handlePDFInsumos(modalVer.cot, modalVer.insumos)}
+                className="py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-medium text-sm flex items-center justify-center gap-2">
+                <Package className="w-4 h-4"/>PDF Insumos
               </button>
             </div>
           </div>
