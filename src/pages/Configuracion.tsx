@@ -1,19 +1,50 @@
 import Layout from '@/components/Layout'
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Save, Building2, CreditCard, CheckCircle } from 'lucide-react'
 import { getConfig, saveConfig, ConfigApp } from '@/lib/config'
 import { inputClass } from '@/components/ui/inputStyles'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
+import { useToast, ToastContainer } from '@/components/Toast'
 
 interface Props { onMenuOpen: () => void }
 
-const Configuracion: React.FC<Props> = ({ onMenuOpen }) => {
-  const [config, setConfig] = useState<ConfigApp>(getConfig())
-  const [saved, setSaved] = useState(false)
+const DEFAULT_CONFIG: ConfigApp = {
+  empresa_nombre: '', empresa_ruc: '', empresa_direccion: '',
+  empresa_telefono: '', empresa_email: '',
+  banco1_nombre: 'BCP', banco1_numero: '',
+  banco2_nombre: 'Interbank', banco2_numero: '',
+  yape_numero: '',
+}
 
-  const handleSave = () => {
-    saveConfig(config)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
+const Configuracion: React.FC<Props> = ({ onMenuOpen }) => {
+  const [config, setConfig] = useState<ConfigApp>(DEFAULT_CONFIG)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const { toasts, addToast, removeToast } = useToast()
+
+  const loadConfig = useCallback(async () => {
+    try { setConfig(await getConfig()) }
+    catch { addToast('Error cargando configuración', 'error') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { loadConfig() }, [loadConfig])
+  // Si se guarda desde otro dispositivo (PC/móvil), esta pantalla se actualiza sola
+  useRealtimeSync('configuracion_app', loadConfig)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const guardada = await saveConfig(config)
+      setConfig(guardada)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      addToast('Error guardando configuración', 'error')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const inp = inputClass
@@ -25,14 +56,17 @@ const Configuracion: React.FC<Props> = ({ onMenuOpen }) => {
         type="text"
         className={inp}
         placeholder={placeholder}
-        value={config[key]}
+        value={config[key] as string}
         onChange={e => setConfig({ ...config, [key]: e.target.value })}
       />
     </div>
   )
 
+  if (loading) return <Layout onMenuOpen={onMenuOpen}><div className="text-center py-12 text-gray-500">Cargando...</div></Layout>
+
   return (
     <Layout onMenuOpen={onMenuOpen}>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
       <div className="max-w-3xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Configuración</h1>
@@ -105,9 +139,9 @@ const Configuracion: React.FC<Props> = ({ onMenuOpen }) => {
         </div>
 
         <div className="flex justify-end pb-4">
-          <button onClick={handleSave}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">
-            <Save className="w-4 h-4" /> Guardar Configuración
+          <button onClick={handleSave} disabled={saving}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-2.5 rounded-lg font-medium transition-colors">
+            <Save className="w-4 h-4" /> {saving ? 'Guardando...' : 'Guardar Configuración'}
           </button>
         </div>
       </div>

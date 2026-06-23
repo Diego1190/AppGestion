@@ -65,6 +65,8 @@ export interface Cotizacion {
   monto_subtotal: number
   monto_desgaste_total: number
   monto_total: number
+  /** Costo aproximado de materiales calculado al crear la cotización (no se recalcula después) */
+  monto_materiales?: number
   estado?: 'Activa' | 'Completada' | 'Cancelada'
 }
 

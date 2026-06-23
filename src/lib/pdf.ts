@@ -4,7 +4,7 @@
 // ============================================================
 import jsPDF from 'jspdf'
 import { MovimientoDepa, Cotizacion, CotizacionDetalle, CotizacionInsumo } from '../types/index'
-import { getConfig } from './config'   // ← lib/config, no pages/
+import { getConfigCached as getConfig } from './config'   // ← lib/config, no pages/
 
 // ── Paleta de colores ────────────────────────────────────────
 type Color = [number, number, number]
@@ -361,7 +361,7 @@ export const generarPDFRecibo = async (
 // COTIZACION
 // ============================================================
 export const generarPDFCotizacion = async (
-  cotizacion: Cotizacion, detalles: CotizacionDetalle[],
+  cotizacion: Cotizacion, detalles: CotizacionDetalle[], totalMateriales?: number,
 ): Promise<Blob> => {
   const cfg = getConfig()
   const doc = new jsPDF()
@@ -448,6 +448,10 @@ export const generarPDFCotizacion = async (
       txt(doc, line, M+5, y+15+i*6, { sz: 8.5, color: C.gray600 })
     })
     y += cardHeight + 5
+  }
+
+  if (totalMateriales != null && totalMateriales > 0) {
+    drawSectionCard('Materiales', [`Incluye un costo aproximado de materiales de S/ ${totalMateriales.toFixed(2)}.`], C.amber800)
   }
 
   if (cotizacion.facilidades_cliente?.trim()) {

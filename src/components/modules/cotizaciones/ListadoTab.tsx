@@ -55,10 +55,12 @@ const ListadoTab: React.FC = () => {
 
   /**
    * Genera el PDF de cotizacion, lo descarga local y lo sube a Storage.
+   * Incluye el monto aproximado de materiales calculado al crear la cotizacion
+   * (no se recalcula despues, porque el precio de los insumos no se persiste en BD).
    * Retorna la URL firmada (o null si la subida falla — el PDF local ya se descargo igual).
    */
   const generarYSubirPDFCotizacion = async (cot: Cotizacion, detalles: CotizacionDetalle[]): Promise<string | null> => {
-    const blob = await generarPDFCotizacion(cot, detalles)
+    const blob = await generarPDFCotizacion(cot, detalles, cot.monto_materiales)
     try {
       return await uploadPDFToStorage(blob, `cotizacion-${cot.correlativo}.pdf`, 'cotizaciones')
     } catch (e) {

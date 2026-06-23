@@ -25,6 +25,8 @@ interface InsumoInterno {
 
 // Insumo agrupado: vista consolidada para mostrar y guardar
 interface InsumoAgrupado {
+  /** Solo presente en manuales: permite distinguir filas con el mismo nombre (o sin nombre) */
+  id?: string
   material_nombre: string
   cantidad: number
   unidad: string
@@ -110,13 +112,16 @@ const CrearCotizacionTab: React.FC = () => {
   const insumosAgrupados = useMemo((): InsumoAgrupado[] => {
     const map = new Map<string, InsumoAgrupado>()
     insumos.forEach(ins => {
-      const key = ins.material_nombre.trim()
+      // Los manuales aún sin nombre (o repetidos) se agrupan por su id único, para que
+      // cada fila sea independiente y editable (antes se descartaban o se mezclaban).
+      const key = ins.es_manual ? ins.id : ins.material_nombre.trim()
       if (!key) return
       if (map.has(key)) {
         const prev = map.get(key)!
         map.set(key, { ...prev, cantidad: prev.cantidad + ins.cantidad })
       } else {
         map.set(key, {
+          id:              ins.es_manual ? ins.id : undefined,
           material_nombre: ins.material_nombre,
           cantidad:        ins.cantidad,
           unidad:          ins.unidad,
@@ -141,9 +146,14 @@ const CrearCotizacionTab: React.FC = () => {
     setPreciosEdit(true)
   }
 
-  // Eliminar todos los internos de un material agrupado
+  // Eliminar todos los internos de un material agrupado (automáticos, por nombre)
   const eliminarMaterial = (nombreMaterial: string) => {
     setInsumos(p => p.filter(i => i.material_nombre !== nombreMaterial))
+  }
+
+  // Eliminar un insumo manual específico por id (evita borrar otros con el mismo nombre o vacíos)
+  const eliminarInsumoManual = (id: string) => {
+    setInsumos(p => p.filter(i => i.id !== id))
   }
 
   // Actualizar precio en todos los internos con mismo nombre
@@ -309,8 +319,9 @@ const CrearCotizacionTab: React.FC = () => {
         monto_subtotal:totalManoObra+costoMat,
         monto_desgaste_total:desgaste,
         monto_total:totalGeneral,
+        monto_materiales:totalMateriales,
         estado:'Activa',
-      } as any)
+      })
 
       if (lineas.length > 0) {
         await createDetalles(lineas.map(l => ({
@@ -515,17 +526,38 @@ const CrearCotizacionTab: React.FC = () => {
             {/* MÓVIL: cards de insumos */}
             <div className="md:hidden space-y-2 mb-4">
               {insumosAgrupados.map(ins => {
-                const interno = insumos.find(i => i.material_nombre === ins.material_nombre && i.es_manual)
+                const interno = ins.es_manual ? insumos.find(i => i.id === ins.id) : undefined
+                const editable = ins.es_manual && preciosEditables && interno
                 return (
-                  <div key={ins.material_nombre} className="flex items-center justify-between bg-gray-50 rounded-xl p-3 border border-gray-200">
-                    <div className="flex-1 min-w-0 mr-3">
-                      <p className="font-medium text-sm text-gray-800 truncate">{ins.material_nombre}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{ins.cantidad.toFixed(2)} {ins.unidad} × S/{ins.precio_unitario.toFixed(2)}</p>
+                  <div key={ins.id ?? ins.material_nombre} className="bg-gray-50 rounded-xl p-3 border border-gray-200 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      {editable ? (
+                        <input type="text" className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                          value={interno.material_nombre} placeholder="Nombre del material" autoFocus
+                          onChange={e => actualizarManual(interno.id, 'material_nombre', e.target.value)}/>
+                      ) : (
+                        <p className="font-medium text-sm text-gray-800 truncate">{ins.material_nombre || <span className="text-gray-400 italic">Sin nombre</span>}</p>
+                      )}
+                      <button onClick={() => ins.es_manual && ins.id ? eliminarInsumoManual(ins.id) : eliminarMaterial(ins.material_nombre)}
+                        className="p-1 text-red-400 hover:bg-red-50 rounded flex-shrink-0"><Trash2 className="w-3.5 h-3.5"/></button>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="font-semibold text-sm text-gray-900">S/{(ins.cantidad*ins.precio_unitario).toFixed(2)}</span>
-                      <button onClick={()=>eliminarMaterial(ins.material_nombre)} className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5"/></button>
-                    </div>
+                    {editable ? (
+                      <div className="flex items-center gap-2">
+                        <input type="number" step="0.01" min="0.01" className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                          value={interno.cantidad} onChange={e => actualizarManual(interno.id, 'cantidad', parseFloat(e.target.value)||0)}/>
+                        <input type="text" className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                          value={interno.unidad} onChange={e => actualizarManual(interno.id, 'unidad', e.target.value)}/>
+                        <span className="text-gray-400 text-xs">S/</span>
+                        <input type="number" step="0.01" min="0" className="w-20 px-2 py-1 border border-amber-300 bg-amber-50 rounded text-sm text-right focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                          value={interno.precio_unitario} onChange={e => actualizarManual(interno.id, 'precio_unitario', parseFloat(e.target.value)||0)}/>
+                        <span className="font-semibold text-sm text-gray-900 ml-auto">S/{(interno.cantidad*interno.precio_unitario).toFixed(2)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-500">{ins.cantidad.toFixed(2)} {ins.unidad} × S/{ins.precio_unitario.toFixed(2)}</p>
+                        <span className="font-semibold text-sm text-gray-900">S/{(ins.cantidad*ins.precio_unitario).toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -543,14 +575,14 @@ const CrearCotizacionTab: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {insumosAgrupados.map(ins => {
-                  // Para edicion manual, encontrar el interno correspondiente
-                  const interno = insumos.find(i => i.material_nombre === ins.material_nombre && i.es_manual)
+                  // Para edicion manual, encontrar el interno correspondiente por id (nombre puede repetirse o estar vacío)
+                  const interno = ins.es_manual ? insumos.find(i => i.id === ins.id) : undefined
                   return (
-                    <tr key={ins.material_nombre} className="hover:bg-gray-50">
+                    <tr key={ins.id ?? ins.material_nombre} className="hover:bg-gray-50">
                       <td className="py-2.5 px-3">
                         {ins.es_manual && preciosEditables && interno ? (
                           <input type="text" className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none"
-                            value={interno.material_nombre} placeholder="Nombre del material"
+                            value={interno.material_nombre} placeholder="Nombre del material" autoFocus
                             onChange={e => actualizarManual(interno.id, 'material_nombre', e.target.value)}/>
                         ) : (
                           <span className="font-medium text-gray-800">{ins.material_nombre || <span className="text-gray-400 italic">Sin nombre</span>}</span>
@@ -576,14 +608,14 @@ const CrearCotizacionTab: React.FC = () => {
                               ${preciosEditables ? 'border-amber-300 bg-amber-50' : 'border-transparent bg-transparent cursor-default'}`}
                             value={ins.precio_unitario}
                             readOnly={!preciosEditables}
-                            onChange={e => actualizarPrecio(ins.material_nombre, parseFloat(e.target.value)||0)}/>
+                            onChange={e => ins.es_manual && interno ? actualizarManual(interno.id, 'precio_unitario', parseFloat(e.target.value)||0) : actualizarPrecio(ins.material_nombre, parseFloat(e.target.value)||0)}/>
                         </div>
                       </td>
                       <td className="py-2.5 px-3 text-right font-semibold text-gray-900">
                         S/ {(ins.cantidad * ins.precio_unitario).toFixed(2)}
                       </td>
                       <td className="py-2.5 px-2">
-                        <button onClick={() => eliminarMaterial(ins.material_nombre)}
+                        <button onClick={() => ins.es_manual && ins.id ? eliminarInsumoManual(ins.id) : eliminarMaterial(ins.material_nombre)}
                           className="p-1 text-red-400 hover:bg-red-50 rounded opacity-60 hover:opacity-100">
                           <Trash2 className="w-3.5 h-3.5"/>
                         </button>

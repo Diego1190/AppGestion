@@ -4,6 +4,7 @@ import { getControlVenta, createControlVenta, updateControlVenta, deleteControlV
 import { ControlVentaCasa } from '@/types/index'
 import { inputClass } from '@/components/ui/inputStyles'
 import { Modal } from '@/components/ui/Modal'
+import { useToast, ToastContainer } from '@/components/Toast'
 
 const TOPE = 6660
 const TOTAL_VENTA = 20000
@@ -25,6 +26,7 @@ const VentaCasaTab: React.FC = () => {
   const [showModal,  setShowModal]  = useState(false)
   const [editPago,   setEditPago]   = useState<any | null>(null)
   const [error, setError] = useState('')
+  const { toasts, addToast, removeToast } = useToast()
   const [formData, setFormData] = useState({
     fecha_pago: '',
     monto_pagado: '',
@@ -43,7 +45,7 @@ const VentaCasaTab: React.FC = () => {
       setPagos(pagosData)
       setTotales(totalesData)
     } catch (e: any) {
-      setError(`Error: ${e.message || 'No se pudieron cargar los datos'}`)
+      addToast(e.message || 'No se pudieron cargar los datos', 'error')
     } finally {
       setLoading(false)
     }
@@ -64,7 +66,7 @@ const VentaCasaTab: React.FC = () => {
         fecha_pago: editPago.fecha_pago,
       })
       setEditPago(null); loadData()
-    } catch (e: any) { setError(e.message || 'Error actualizando el pago') }
+    } catch (e: any) { addToast(e.message || 'Error actualizando el pago', 'error') }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,11 +76,12 @@ const VentaCasaTab: React.FC = () => {
     const monto = parseFloat(formData.monto_pagado)
     if (isNaN(monto) || monto < 200) { setError('El monto mínimo es $ 200'); return }
     try {
-      const entregadoReal = formData.entregado_a === 'Tu' ? 'Tú' : formData.entregado_a
+      const entregadoReal: 'Gabriel' | 'Fernando' | 'Tú' =
+        formData.entregado_a === 'Tu' ? 'Tú' : (formData.entregado_a as 'Gabriel' | 'Fernando')
       await createControlVenta({
         fecha_pago: formData.fecha_pago,
         monto_pagado: monto,
-        entregado_a: entregadoReal as any,
+        entregado_a: entregadoReal,
       })
       setFormData({ fecha_pago: '', monto_pagado: '', entregado_a: '' })
       setShowModal(false)
@@ -91,7 +94,7 @@ const VentaCasaTab: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Eliminar este pago?')) return
     try { await deleteControlVenta(id); loadData() }
-    catch (e: any) { setError(e.message || 'Error eliminando') }
+    catch (e: any) { addToast(e.message || 'Error eliminando', 'error') }
   }
 
   const getHermanoKey = (entregado: string): Hermano => {
@@ -106,6 +109,7 @@ const VentaCasaTab: React.FC = () => {
 
   return (
     <div>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-red-700 text-sm">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
