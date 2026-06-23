@@ -4,6 +4,7 @@ import { getCatalogo, createCotizacion, createDetalles, createInsumos } from '@/
 import { generarCorrelativo, calcularPared, calcularTecho, validarTelefono, MedidaParante } from '@/lib/calculations'
 import { CatalogoServicio } from '@/types/index'
 import { useToast, ToastContainer, FieldError } from '@/components/Toast'
+import { inputClass } from '@/components/ui/inputStyles'
 
 // ── Tipos ────────────────────────────────────────────────────
 interface LineaServicio {
@@ -339,7 +340,7 @@ const CrearCotizacionTab: React.FC = () => {
   }
 
   // ── Render helpers ───────────────────────────────────────────
-  const inp = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+  const inp = inputClass
   const Toggle = ({ active, onChange, label }: { active:boolean; onChange:()=>void; label:string }) => (
     <button type="button" onClick={onChange}
       className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all

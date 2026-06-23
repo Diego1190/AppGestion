@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, CheckCircle, Clock } from 'lucide-react'
+import { Plus, Trash2, CheckCircle, Clock, Pencil } from 'lucide-react'
 import { getGastos, createGasto, updateGasto, deleteGasto } from '@/lib/finanzas'
 import { GastoPersonal } from '@/types/index'
 import { useToast, ToastContainer, ConfirmModal } from '@/components/Toast'
+import { Modal } from '@/components/ui/Modal'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -83,18 +84,18 @@ const GastosTab: React.FC = () => {
       <ConfirmModal open={!!confirmId} titulo="Eliminar Gasto" mensaje="¿Eliminar este gasto?" tipo="danger" onConfirm={handleEliminar} onCancel={()=>setConfirmId(null)}/>
 
       {/* Resumen */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="bg-white rounded-xl border p-3 md:p-4">
-          <p className="text-xs md:text-sm text-gray-500">Gastos</p>
-          <p className="text-xl md:text-2xl font-bold text-gray-900">{gastosFiltrados.length}</p>
+      <div className="bg-white rounded-xl border p-4 mb-5">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm text-gray-500">{gastosFiltrados.length} gasto{gastosFiltrados.length!==1?'s':''} este mes</p>
+          <p className="text-lg font-bold text-gray-900">S/ {(totalPendiente+totalPagado).toFixed(2)}</p>
         </div>
-        <div className="bg-yellow-50 rounded-xl border border-yellow-200 p-3 md:p-4">
-          <p className="text-xs text-yellow-700">Pendiente</p>
-          <p className="text-base md:text-2xl font-bold text-yellow-800">S/ {totalPendiente.toFixed(2)}</p>
+        <div className="h-2 rounded-full bg-yellow-100 overflow-hidden mb-2">
+          <div className="h-full bg-green-500 rounded-full transition-all"
+            style={{ width: `${(totalPendiente+totalPagado) > 0 ? (totalPagado/(totalPendiente+totalPagado))*100 : 0}%` }}/>
         </div>
-        <div className="bg-green-50 rounded-xl border border-green-200 p-3 md:p-4">
-          <p className="text-xs text-green-700">Pagado</p>
-          <p className="text-base md:text-2xl font-bold text-green-800">S/ {totalPagado.toFixed(2)}</p>
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-green-700 font-medium">Pagado S/ {totalPagado.toFixed(2)}</span>
+          <span className="text-yellow-700 font-medium">Pendiente S/ {totalPendiente.toFixed(2)}</span>
         </div>
       </div>
 
@@ -151,7 +152,7 @@ const GastosTab: React.FC = () => {
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-gray-100">
-                <button onClick={()=>setEditItem({...g})} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                <button onClick={()=>setEditItem({...g})} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar"><Pencil className="w-4 h-4"/></button>
                 <button onClick={()=>setConfirmId(g.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
               </div>
             </div>
@@ -191,7 +192,7 @@ const GastosTab: React.FC = () => {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <button onClick={()=>setEditItem({...g})} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                      <button onClick={()=>setEditItem({...g})} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar"><Pencil className="w-4 h-4"/></button>
                       <button onClick={()=>setConfirmId(g.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
                     </div>
                   </td>
@@ -202,54 +203,50 @@ const GastosTab: React.FC = () => {
       </div>
 
       {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
-            <div className="px-5 py-4 border-b flex justify-between items-center">
-              <h2 className="text-lg font-semibold">Nuevo Gasto</h2>
-              <button onClick={()=>setShowModal(false)} className="text-gray-400 text-2xl leading-none">✕</button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="px-5 py-4 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Concepto</label>
-                  <input type="text" className={inp} placeholder="Ej: Internet, Colegio..."
-                    value={form.concepto} onChange={e=>setForm({...form,concepto:e.target.value})} required/>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Fecha Vencimiento</label>
-                    <input type="date" className={inp} value={form.fecha_vencimiento}
-                      onChange={e=>setForm({...form,fecha_vencimiento:e.target.value})} required/>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">Monto (S/)</label>
-                    <input type="number" step="0.01" min="0.01" className={inp} placeholder="0.00"
-                      value={form.monto} onChange={e=>setForm({...form,monto:e.target.value})} required/>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Estado</label>
-                  <select className={inp} value={form.estado} onChange={e=>setForm({...form,estado:e.target.value as any})}>
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="Pagado">Pagado</option>
-                  </select>
-                </div>
-              </div>
-              <div className="px-5 py-4 border-t grid grid-cols-2 gap-3">
-                <button type="button" onClick={()=>setShowModal(false)}
-                  className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium text-sm">Cancelar</button>
-                <button type="submit"
-                  className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm">Guardar</button>
-              </div>
-            </form>
+      <Modal open={showModal}>
+          <div className="px-5 py-4 border-b flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Nuevo Gasto</h2>
+            <button onClick={()=>setShowModal(false)} className="text-gray-400 text-2xl leading-none">✕</button>
           </div>
-        </div>
-      )}
+          <form onSubmit={handleSubmit}>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Concepto</label>
+                <input type="text" className={inp} placeholder="Ej: Internet, Colegio..."
+                  value={form.concepto} onChange={e=>setForm({...form,concepto:e.target.value})} required/>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Fecha Vencimiento</label>
+                  <input type="date" className={inp} value={form.fecha_vencimiento}
+                    onChange={e=>setForm({...form,fecha_vencimiento:e.target.value})} required/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Monto (S/)</label>
+                  <input type="number" step="0.01" min="0.01" className={inp} placeholder="0.00"
+                    value={form.monto} onChange={e=>setForm({...form,monto:e.target.value})} required/>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Estado</label>
+                <select className={inp} value={form.estado} onChange={e=>setForm({...form,estado:e.target.value as any})}>
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="Pagado">Pagado</option>
+                </select>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t grid grid-cols-2 gap-3">
+              <button type="button" onClick={()=>setShowModal(false)}
+                className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium text-sm">Cancelar</button>
+              <button type="submit"
+                className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm">Guardar</button>
+            </div>
+          </form>
+      </Modal>
       {/* Modal Editar */}
-      {editItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
+      <Modal open={!!editItem}>
+        {editItem && (
+          <>
             <div className="px-5 py-4 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold">Editar Gasto</h2>
               <button onClick={()=>setEditItem(null)} className="text-gray-400 text-2xl leading-none">✕</button>
@@ -289,9 +286,9 @@ const GastosTab: React.FC = () => {
                   className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm">Guardar</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

@@ -4,6 +4,8 @@ import { Plus, Zap, Droplets, Home, Wifi, Flame, MoreHorizontal, Pencil, Trash2 
 import { getMovimientos, createMovimiento, updateMovimiento, deleteMovimiento, getLecturaAnterior, getInquilinos, getContratos } from '@/lib/alquileres'
 import { MovimientoDepa, Inquilino, Contrato } from '@/types/index'
 import { useToast, ToastContainer, ConfirmModal } from '@/components/Toast'
+import { inputClass } from '@/components/ui/inputStyles'
+import { Modal } from '@/components/ui/Modal'
 
 const SERVICIOS = ['Alquiler', 'Luz', 'Agua', 'Internet', 'Gas', 'Otro'] as const
 type Servicio = typeof SERVICIOS[number]
@@ -149,7 +151,7 @@ const MovimientosTab: React.FC = () => {
 
   const esLuzAgua = form.tipo_servicio === 'Luz' || form.tipo_servicio === 'Agua'
   const esAlquiler = form.tipo_servicio === 'Alquiler'
-  const inp = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+  const inp = inputClass
 
   if (loading) return <div className="text-center py-12 text-gray-500">Cargando...</div>
 
@@ -296,112 +298,108 @@ const MovimientosTab: React.FC = () => {
       </div>
 
       {/* MODAL NUEVO MOVIMIENTO */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
-            <div className="px-5 py-4 border-b flex justify-between">
-              <h2 className="text-base font-semibold">Nuevo Movimiento</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl leading-none">✕</button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="px-5 py-4 space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Tipo de Servicio</label>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                    {SERVICIOS.map(s => {
-                      const Icono = ICONOS[s]
-                      const active = form.tipo_servicio === s
-                      return (
-                        <button key={s} type="button"
-                          onClick={() => setForm(f => ({ ...f, tipo_servicio: s, importe_pagar: '', lectura_actual: '', tarifa: '' }))}
-                          className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border transition-all ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-500'}`}>
-                          <Icono className="w-4 h-4"/>
-                          <span className="text-[10px] font-medium leading-none mt-0.5">{s}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
-                  <select className={inp} value={form.num_depa}
-                    onChange={e => setForm(f => ({ ...f, num_depa: e.target.value === '' ? '' : parseInt(e.target.value) }))} required>
-                    <option value="">— Seleccionar departamento —</option>
-                    {depasDisponibles.map(d => (
-                      <option key={d.num_depa} value={d.num_depa}>Depa {d.num_depa} — {d.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Vencimiento</label>
-                    <input type="date" className={inp} value={form.fecha_vencimiento}
-                      onChange={e => setForm(f => ({ ...f, fecha_vencimiento: e.target.value }))} required/>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Importe (S/)
-                      {esAlquiler && <span className="text-gray-400 font-normal text-xs ml-1">del contrato</span>}
-                    </label>
-                    <input type="number" step="0.01" min="0.01" className={`${inp} ${(esAlquiler) ? 'bg-gray-50' : ''}`}
-                      value={form.importe_pagar}
-                      onChange={e => setForm(f => ({ ...f, importe_pagar: e.target.value }))}
-                      readOnly={esAlquiler} required placeholder="0.00"/>
-                  </div>
-                </div>
-
-                {esLuzAgua && (
-                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 space-y-2">
-                    <p className="text-xs font-semibold text-blue-700 uppercase">Medidor — {form.tipo_servicio}</p>
-                    <div className="text-xs bg-white border border-blue-200 rounded px-2 py-1.5 text-gray-600">
-                      Lectura anterior:{' '}
-                      <strong>{cargandoLectura ? 'Buscando...' : lecturaAnterior !== null ? lecturaAnterior : 'No encontrada'}</strong>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Lectura Actual</label>
-                        <input type="number" step="0.01" className={inp} value={form.lectura_actual}
-                          onChange={e => setForm(f => ({ ...f, lectura_actual: e.target.value }))} required/>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Tarifa (S/)</label>
-                        <input type="number" step="0.001" className={inp} value={form.tarifa}
-                          onChange={e => setForm(f => ({ ...f, tarifa: e.target.value }))} required/>
-                      </div>
-                    </div>
-                    {lecturaAnterior !== null && form.lectura_actual && form.tarifa && (
-                      <div className="flex justify-between text-xs text-blue-700 bg-blue-100 rounded px-2 py-1.5">
-                        <span>Consumo: <strong>{(parseFloat(form.lectura_actual) - lecturaAnterior).toFixed(2)} {form.tipo_servicio==='Luz'?'kWh':'m³'}</strong></span>
-                        <span>Total: <strong>S/ {form.importe_pagar}</strong></span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                  <select className={inp} value={form.estado}
-                    onChange={e => setForm(f => ({ ...f, estado: e.target.value as any }))}>
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="Pagado">Pagado</option>
-                  </select>
-                </div>
-              </div>
-              <div className="px-5 py-3 border-t flex gap-2 justify-end">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button>
-              </div>
-            </form>
+      <Modal open={showModal}>
+          <div className="px-5 py-4 border-b flex justify-between">
+            <h2 className="text-base font-semibold">Nuevo Movimiento</h2>
+            <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl leading-none">✕</button>
           </div>
-        </div>
-      )}
+          <form onSubmit={handleSubmit}>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Tipo de Servicio</label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  {SERVICIOS.map(s => {
+                    const Icono = ICONOS[s]
+                    const active = form.tipo_servicio === s
+                    return (
+                      <button key={s} type="button"
+                        onClick={() => setForm(f => ({ ...f, tipo_servicio: s, importe_pagar: '', lectura_actual: '', tarifa: '' }))}
+                        className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border transition-all ${active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 hover:border-gray-300 text-gray-500'}`}>
+                        <Icono className="w-4 h-4"/>
+                        <span className="text-[10px] font-medium leading-none mt-0.5">{s}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+                <select className={inp} value={form.num_depa}
+                  onChange={e => setForm(f => ({ ...f, num_depa: e.target.value === '' ? '' : parseInt(e.target.value) }))} required>
+                  <option value="">— Seleccionar departamento —</option>
+                  {depasDisponibles.map(d => (
+                    <option key={d.num_depa} value={d.num_depa}>Depa {d.num_depa} — {d.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha Vencimiento</label>
+                  <input type="date" className={inp} value={form.fecha_vencimiento}
+                    onChange={e => setForm(f => ({ ...f, fecha_vencimiento: e.target.value }))} required/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Importe (S/)
+                    {esAlquiler && <span className="text-gray-400 font-normal text-xs ml-1">del contrato</span>}
+                  </label>
+                  <input type="number" step="0.01" min="0.01" className={`${inp} ${(esAlquiler) ? 'bg-gray-50' : ''}`}
+                    value={form.importe_pagar}
+                    onChange={e => setForm(f => ({ ...f, importe_pagar: e.target.value }))}
+                    readOnly={esAlquiler} required placeholder="0.00"/>
+                </div>
+              </div>
+
+              {esLuzAgua && (
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 space-y-2">
+                  <p className="text-xs font-semibold text-blue-700 uppercase">Medidor — {form.tipo_servicio}</p>
+                  <div className="text-xs bg-white border border-blue-200 rounded px-2 py-1.5 text-gray-600">
+                    Lectura anterior:{' '}
+                    <strong>{cargandoLectura ? 'Buscando...' : lecturaAnterior !== null ? lecturaAnterior : 'No encontrada'}</strong>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Lectura Actual</label>
+                      <input type="number" step="0.01" className={inp} value={form.lectura_actual}
+                        onChange={e => setForm(f => ({ ...f, lectura_actual: e.target.value }))} required/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Tarifa (S/)</label>
+                      <input type="number" step="0.001" className={inp} value={form.tarifa}
+                        onChange={e => setForm(f => ({ ...f, tarifa: e.target.value }))} required/>
+                    </div>
+                  </div>
+                  {lecturaAnterior !== null && form.lectura_actual && form.tarifa && (
+                    <div className="flex justify-between text-xs text-blue-700 bg-blue-100 rounded px-2 py-1.5">
+                      <span>Consumo: <strong>{(parseFloat(form.lectura_actual) - lecturaAnterior).toFixed(2)} {form.tipo_servicio==='Luz'?'kWh':'m³'}</strong></span>
+                      <span>Total: <strong>S/ {form.importe_pagar}</strong></span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                <select className={inp} value={form.estado}
+                  onChange={e => setForm(f => ({ ...f, estado: e.target.value as any }))}>
+                  <option value="Pendiente">Pendiente</option>
+                  <option value="Pagado">Pagado</option>
+                </select>
+              </div>
+            </div>
+            <div className="px-5 py-3 border-t flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cancelar</button>
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button>
+            </div>
+          </form>
+      </Modal>
 
       {/* MODAL EDITAR MOVIMIENTO */}
-      {editMov && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
+      <Modal open={!!editMov}>
+        {editMov && (
+          <>
             <div className="px-5 py-4 border-b flex justify-between items-center">
               <h2 className="text-base font-semibold">Editar Movimiento</h2>
               <button onClick={() => setEditMov(null)} className="text-gray-400 text-xl leading-none">✕</button>
@@ -442,9 +440,9 @@ const MovimientosTab: React.FC = () => {
                   className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, AlertCircle, TrendingUp, Lock, Pencil } from 'lucide-react'
 import { getControlVenta, createControlVenta, updateControlVenta, deleteControlVenta, getTotalPorHermano } from '@/lib/finanzas'
 import { ControlVentaCasa } from '@/types/index'
+import { inputClass } from '@/components/ui/inputStyles'
+import { Modal } from '@/components/ui/Modal'
 
 const TOPE = 6660
 const TOTAL_VENTA = 20000
@@ -263,75 +265,71 @@ const VentaCasaTab: React.FC = () => {
       </div>
 
       {/* Modal Registrar Pago */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-md">
-            <div className="px-5 sm:px-6 py-4 border-b flex justify-between items-center">
-              <h2 className="text-lg font-semibold">Registrar Pago</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl">✕</button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="px-5 sm:px-6 py-4 space-y-4">
-                {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium mb-1">Fecha de Pago</label>
-                  <input type="date" className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-                    value={formData.fecha_pago}
-                    onChange={e => setFormData({...formData, fecha_pago: e.target.value})} required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Monto ($) <span className="text-gray-400 font-normal">— mínimo $ 200</span>
-                  </label>
-                  <input type="number" step="0.01" min="200"
-                    className="w-full px-3 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-                    placeholder="200.00"
-                    value={formData.monto_pagado}
-                    onChange={e => setFormData({...formData, monto_pagado: e.target.value})} required />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Entregado a</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {HERMANOS.map(h => {
-                      const bloqueado = (totales[h] || 0) >= TOPE
-                      const c = COLORES[h]
-                      const sel = formData.entregado_a === h
-                      const disponible = Math.max(0, TOPE - (totales[h] || 0))
-                      return (
-                        <button key={h} type="button"
-                          disabled={bloqueado}
-                          onClick={() => !bloqueado && setFormData({...formData, entregado_a: h})}
-                          className={`relative p-3 rounded-lg border-2 transition-all text-center ${
-                            bloqueado ? 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200'
-                              : sel ? `${c.bg} border-blue-500 ${c.text} font-semibold`
-                              : 'bg-white border-gray-200 hover:border-gray-300'
-                          }`}>
-                          {bloqueado && <Lock className="w-3 h-3 absolute top-1 right-1 text-gray-400" />}
-                          <span className="block font-medium text-sm">{LABEL[h]}</span>
-                          <span className="block text-xs text-gray-500 mt-0.5">$ {disponible.toFixed(0)} disp.</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-              <div className="px-5 sm:px-6 py-4 border-t grid grid-cols-2 gap-3">
-                <button type="button" onClick={() => setShowModal(false)}
-                  className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cancelar</button>
-                <button type="submit"
-                  className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button>
-              </div>
-            </form>
+      <Modal open={showModal}>
+          <div className="px-5 sm:px-6 py-4 border-b flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Registrar Pago</h2>
+            <button onClick={() => setShowModal(false)} className="text-gray-400 text-xl">✕</button>
           </div>
-        </div>
-      )}
+          <form onSubmit={handleSubmit}>
+            <div className="px-5 sm:px-6 py-4 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+              )}
+              <div>
+                <label className="block text-sm font-medium mb-1">Fecha de Pago</label>
+                <input type="date" className={inputClass}
+                  value={formData.fecha_pago}
+                  onChange={e => setFormData({...formData, fecha_pago: e.target.value})} required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Monto ($) <span className="text-gray-400 font-normal">— mínimo $ 200</span>
+                </label>
+                <input type="number" step="0.01" min="200"
+                  className={inputClass}
+                  placeholder="200.00"
+                  value={formData.monto_pagado}
+                  onChange={e => setFormData({...formData, monto_pagado: e.target.value})} required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Entregado a</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {HERMANOS.map(h => {
+                    const bloqueado = (totales[h] || 0) >= TOPE
+                    const c = COLORES[h]
+                    const sel = formData.entregado_a === h
+                    const disponible = Math.max(0, TOPE - (totales[h] || 0))
+                    return (
+                      <button key={h} type="button"
+                        disabled={bloqueado}
+                        onClick={() => !bloqueado && setFormData({...formData, entregado_a: h})}
+                        className={`relative p-3 rounded-lg border-2 transition-all text-center ${
+                          bloqueado ? 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200'
+                            : sel ? `${c.bg} border-blue-500 ${c.text} font-semibold`
+                            : 'bg-white border-gray-200 hover:border-gray-300'
+                        }`}>
+                        {bloqueado && <Lock className="w-3 h-3 absolute top-1 right-1 text-gray-400" />}
+                        <span className="block font-medium text-sm">{LABEL[h]}</span>
+                        <span className="block text-xs text-gray-500 mt-0.5">$ {disponible.toFixed(0)} disp.</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+            <div className="px-5 sm:px-6 py-4 border-t grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => setShowModal(false)}
+                className="py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm">Cancelar</button>
+              <button type="submit"
+                className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button>
+            </div>
+          </form>
+      </Modal>
 
       {/* Modal Editar Pago */}
-      {editPago && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md">
+      <Modal open={!!editPago}>
+        {editPago && (
+          <>
             <div className="px-5 py-4 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold">Editar Pago</h2>
               <button onClick={()=>setEditPago(null)} className="text-gray-400 text-2xl leading-none">✕</button>
@@ -340,7 +338,7 @@ const VentaCasaTab: React.FC = () => {
               <div className="px-5 py-4 space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Para</label>
-                  <select className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  <select className={inputClass}
                     value={editPago.entregado_a}
                     onChange={e=>setEditPago({...editPago,entregado_a:e.target.value})}>
                     <option value="Gabriel">Gabriel</option>
@@ -351,13 +349,13 @@ const VentaCasaTab: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Fecha</label>
-                    <input type="date" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    <input type="date" className={inputClass}
                       value={editPago.fecha_pago}
                       onChange={e=>setEditPago({...editPago,fecha_pago:e.target.value})}/>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Monto ($)</label>
-                    <input type="number" step="0.01" min="0" className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    <input type="number" step="0.01" min="0" className={inputClass}
                       value={editPago.monto_pagado}
                       onChange={e=>setEditPago({...editPago,monto_pagado:parseFloat(e.target.value)||0})}/>
                   </div>
@@ -370,9 +368,9 @@ const VentaCasaTab: React.FC = () => {
                   className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm">Guardar</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

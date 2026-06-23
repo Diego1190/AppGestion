@@ -2,6 +2,7 @@ import Layout from '@/components/Layout'
 import React, { useState } from 'react'
 import { Save, Building2, CreditCard, CheckCircle } from 'lucide-react'
 import { getConfig, saveConfig, ConfigApp } from '@/lib/config'
+import { inputClass } from '@/components/ui/inputStyles'
 
 interface Props { onMenuOpen: () => void }
 
@@ -15,7 +16,7 @@ const Configuracion: React.FC<Props> = ({ onMenuOpen }) => {
     setTimeout(() => setSaved(false), 3000)
   }
 
-  const inp = "w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+  const inp = inputClass
 
   const field = (label: string, key: keyof ConfigApp, placeholder = '') => (
     <div>

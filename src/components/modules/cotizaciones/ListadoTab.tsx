@@ -5,6 +5,7 @@ import { generarPDFCotizacion, generarPDFInsumos } from '@/lib/pdf'
 import { uploadPDFToStorage } from '@/lib/supabaseStorage'
 import { Cotizacion, CotizacionDetalle, CotizacionInsumo } from '@/types/index'
 import { useToast, ToastContainer, ConfirmModal } from '@/components/Toast'
+import { Modal } from '@/components/ui/Modal'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 
 const ListadoTab: React.FC = () => {
@@ -183,17 +184,25 @@ const ListadoTab: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100">
-                  <span className={`flex-1 text-xs px-2 py-1 rounded-full font-medium text-center ${estado==='Completada'?'bg-green-100 text-green-700':'bg-blue-100 text-blue-700'}`}>
-                    {estado}
-                  </span>
-                  <button onClick={()=>abrirVer(cot)} disabled={cargando} title="Ver detalle" className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Eye className="w-4 h-4"/></button>
-                  <button onClick={()=>handlePDFInsumosDesdeListado(cot)} title="PDF de insumos" className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg"><Package className="w-4 h-4"/></button>
-                  <button onClick={()=>enviarPorWhatsAppDesdeListado(cot)} disabled={enviando} title="Enviar por WhatsApp" className="p-2 text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-40">
-                    {enviando ? <Loader2 className="w-4 h-4 animate-spin"/> : <MessageCircle className="w-4 h-4"/>}
-                  </button>
-                  <button onClick={()=>handleMarcarCompletada(cot)} title="Marcar completada" className={`p-2 rounded-lg ${estado==='Completada'?'text-gray-400 hover:bg-gray-100':'text-green-600 hover:bg-green-50'}`}><CheckCircle className="w-4 h-4"/></button>
-                  <button onClick={()=>setConfirmId(cot.id)} title="Eliminar" className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                <div className="pt-2 border-t border-gray-100 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`flex-1 text-xs px-2 py-1 rounded-full font-medium text-center ${estado==='Completada'?'bg-green-100 text-green-700':'bg-blue-100 text-blue-700'}`}>
+                      {estado}
+                    </span>
+                    <button onClick={()=>abrirVer(cot)} disabled={cargando}
+                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg disabled:opacity-40">
+                      <Eye className="w-3.5 h-3.5"/>Ver
+                    </button>
+                    <button onClick={()=>enviarPorWhatsAppDesdeListado(cot)} disabled={enviando}
+                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 text-green-700 bg-green-50 hover:bg-green-100 rounded-lg disabled:opacity-40">
+                      {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <MessageCircle className="w-3.5 h-3.5"/>}WhatsApp
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-end gap-1">
+                    <button onClick={()=>handlePDFInsumosDesdeListado(cot)} title="PDF de insumos" className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg"><Package className="w-4 h-4"/></button>
+                    <button onClick={()=>handleMarcarCompletada(cot)} title="Marcar completada" className={`p-2 rounded-lg ${estado==='Completada'?'text-gray-400 hover:bg-gray-100':'text-green-600 hover:bg-green-50'}`}><CheckCircle className="w-4 h-4"/></button>
+                    <button onClick={()=>setConfirmId(cot.id)} title="Eliminar" className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4"/></button>
+                  </div>
                 </div>
               </div>
             )
@@ -252,9 +261,9 @@ const ListadoTab: React.FC = () => {
       </div>
 
       {/* Modal detalle */}
-      {modalVer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Modal open={!!modalVer} maxWidth="2xl">
+        {modalVer && (
+          <>
             <div className="px-5 py-4 border-b flex justify-between items-start sticky top-0 bg-white z-10">
               <div>
                 <h2 className="text-base font-semibold">{modalVer.cot.correlativo}</h2>
@@ -311,9 +320,9 @@ const ListadoTab: React.FC = () => {
                 WhatsApp
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

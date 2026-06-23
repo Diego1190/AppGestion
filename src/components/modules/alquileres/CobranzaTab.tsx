@@ -6,6 +6,7 @@ import { generarPDFRecibo } from '@/lib/pdf'
 import { uploadPDFToStorage } from '@/lib/supabaseStorage'
 import { Inquilino, MovimientoDepa } from '@/types/index'
 import { useToast, ToastContainer } from '@/components/Toast'
+import { Modal } from '@/components/ui/Modal'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -263,9 +264,9 @@ const CobranzaTab: React.FC = () => {
       </div>
 
       {/* Modal Ver Recibo */}
-      {reciboModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <Modal open={!!reciboModal} maxWidth="lg">
+        {reciboModal && (
+          <>
             <div className="px-5 sm:px-6 py-4 border-b flex justify-between items-start sticky top-0 bg-white">
               <div>
                 <h2 className="text-base sm:text-lg font-semibold">Recibo — {MESES[mes-1]} {anio}</h2>
@@ -273,8 +274,38 @@ const CobranzaTab: React.FC = () => {
               </div>
               <button onClick={() => setReciboModal(null)} className="text-gray-400 text-xl ml-4 flex-shrink-0">✕</button>
             </div>
-            <div className="px-5 sm:px-6 py-4 overflow-x-auto">
-              <table className="w-full min-w-[480px]">
+            {/* ── MÓVIL: lista de conceptos en cards ── */}
+            <div className="sm:hidden px-5 py-4 space-y-2">
+              {reciboModal.movs.map(m => (
+                <div key={m.id} className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-900 truncate">
+                      {m.tipo_servicio}
+                      {m.consumo!=null && <span className="text-xs text-gray-400 ml-1">({Number(m.consumo).toFixed(2)} {m.tipo_servicio==='Luz'?'kWh':'m³'})</span>}
+                    </p>
+                    <p className="text-xs text-gray-500">{new Date(m.fecha_vencimiento+'T00:00:00').toLocaleDateString('es-PE')}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-sm font-medium">S/ {Number(m.importe_pagar).toFixed(2)}</span>
+                    <button onClick={() => toggleEstado(m)} className={`text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer ${m.estado==='Pagado'?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{m.estado}</button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-1">
+                <span className="font-bold text-gray-900">TOTAL</span>
+                <span className="font-bold text-gray-900 text-lg">S/ {reciboModal.movs.reduce((s,m)=>s+Number(m.importe_pagar),0).toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* ── DESKTOP: tabla con columnas fijas (no se desborda) ── */}
+            <div className="hidden sm:block px-5 sm:px-6 py-4">
+              <table className="w-full" style={{ tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '34%' }}/>
+                  <col style={{ width: '22%' }}/>
+                  <col style={{ width: '22%' }}/>
+                  <col style={{ width: '22%' }}/>
+                </colgroup>
                 <thead><tr className="border-b">
                   <th className="text-left py-2 text-sm font-semibold text-gray-700">Concepto</th>
                   <th className="text-left py-2 text-sm font-semibold text-gray-700">Vcto</th>
@@ -284,7 +315,7 @@ const CobranzaTab: React.FC = () => {
                 <tbody>
                   {reciboModal.movs.map(m => (
                     <tr key={m.id} className="border-b border-gray-100">
-                      <td className="py-2 text-sm text-gray-900">{m.tipo_servicio}{m.consumo!=null&&<span className="text-xs text-gray-400 ml-1">({Number(m.consumo).toFixed(2)} {m.tipo_servicio==='Luz'?'kWh':'m³'})</span>}</td>
+                      <td className="py-2 text-sm text-gray-900 truncate">{m.tipo_servicio}{m.consumo!=null&&<span className="text-xs text-gray-400 ml-1">({Number(m.consumo).toFixed(2)} {m.tipo_servicio==='Luz'?'kWh':'m³'})</span>}</td>
                       <td className="py-2 text-sm text-gray-600">{new Date(m.fecha_vencimiento+'T00:00:00').toLocaleDateString('es-PE')}</td>
                       <td className="py-2 text-sm text-right font-medium">S/ {Number(m.importe_pagar).toFixed(2)}</td>
                       <td className="py-2 text-center"><button onClick={() => toggleEstado(m)} className={`text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer ${m.estado==='Pagado'?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>{m.estado}</button></td>
@@ -298,6 +329,7 @@ const CobranzaTab: React.FC = () => {
                 </tr></tfoot>
               </table>
             </div>
+
             <div className="px-5 sm:px-6 py-4 border-t flex flex-col sm:flex-row gap-2 sm:justify-end sticky bottom-0 bg-white">
               <button onClick={() => setReciboModal(null)} className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-sm order-3 sm:order-1">Cerrar</button>
               <button onClick={() => handlePDF(reciboModal.inq)} disabled={generandoPDF===reciboModal.inq.id}
@@ -311,9 +343,9 @@ const CobranzaTab: React.FC = () => {
                 WhatsApp
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }
