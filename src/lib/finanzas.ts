@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { GastoPersonal, ControlVentaCasa } from '../types/index'
+import { validarPagoVentaCasa } from './calculations'
 
 // GASTOS PERSONALES
 export const getGastos = async (): Promise<GastoPersonal[]> => {
@@ -41,8 +42,6 @@ export const getControlVenta = async (): Promise<ControlVentaCasa[]> => {
 export const createControlVenta = async (
   control: Omit<ControlVentaCasa, 'id' | 'mes' | 'anio'>
 ): Promise<ControlVentaCasa> => {
-  if (control.monto_pagado < 200) throw new Error('El monto minimo es S/ 200')
-
   const { data: pagosExistentes, error: errPagos } = await supabase
     .from('control_venta_casa')
     .select('monto_pagado')
@@ -51,12 +50,8 @@ export const createControlVenta = async (
   if (errPagos) throw new Error(errPagos.message)
 
   const totalActual = (pagosExistentes || []).reduce((s, p) => s + Number(p.monto_pagado), 0)
-  const nuevoTotal = totalActual + control.monto_pagado
-
-  if (nuevoTotal > 6666.66) {
-    const disponible = (6666.66 - totalActual).toFixed(2)
-    throw new Error(`Tope excedido. Solo disponible S/ ${disponible} para ${control.entregado_a}`)
-  }
+  const validacion = validarPagoVentaCasa(control.monto_pagado, totalActual, control.entregado_a)
+  if (!validacion.valido) throw new Error(validacion.mensaje)
 
   const fecha = new Date(control.fecha_pago)
   const mes = fecha.getMonth() + 1

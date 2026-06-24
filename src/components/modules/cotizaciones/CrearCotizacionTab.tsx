@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Plus, Trash2, ToggleLeft, ToggleRight, Calculator, Package, Lock } from 'lucide-react'
 import { getCatalogo, createCotizacion, createDetalles, createInsumos } from '@/lib/cotizaciones'
-import { generarCorrelativo, calcularPared, calcularTecho, validarTelefono, MedidaParante } from '@/lib/calculations'
+import {
+  generarCorrelativo, calcularPared, calcularTecho, validarTelefono, MedidaParante,
+  armarInsumosPared, armarInsumosTecho, armarInsumosMelamina,
+} from '@/lib/calculations'
 import { CatalogoServicio } from '@/types/index'
 import { useToast, ToastContainer, FieldError } from '@/components/Toast'
 import { inputClass } from '@/components/ui/inputStyles'
@@ -45,22 +48,6 @@ const CONDICIONES_DEFAULT: Condicion[] = [
 ]
 
 const ACABADOS = ['Blanco','Blanco Brillante','Crema','Cerezo','Nogal','Wengue','Negro','Roble','Personalizado']
-
-// Precios referenciales de materiales (fuente unica de verdad en este componente)
-const PRECIOS_REF: Record<string, number> = {
-  'Plancha Drywall 1/2"':28.5, 'Parante 64mm (3m)':6, 'Riel 65mm (3m)':5.5,
-  'Parante 38mm (3m)':5, 'Riel 39mm (3m)':4.5, 'Parante 89mm (3m)':8, 'Riel 90mm (3m)':7.5,
-  'Esquinero Metalico 2.44m':3.5, 'Cinta de Papel 75m':8, 'Masilla Drywall 5kg':18,
-  'Tornillos Punta Fina 1"':12, 'Tornillos Punta Broca 1/2"':0.05,
-  'Anclajes (fulminante+clavo)':0.8,
-  'Perfil Omega 3m':8.5, 'Parante/Colgante Techo':4, 'Riel Perimetral 3m':5,
-  'Calamina 3.60m':20, 'Eternit 3.60m':48, 'Polipropileno 3.60m':55,
-  'Tornillo Autoperforante 2"':0.25, 'Tornillo Hex 5/16"':0.30,
-  'Masilla Selladora 300ml':12, 'Cinta Aluminio 50mmx25m':18,
-  'Canaleta Metalica':12, 'Canto Delgado (ml)':3.5, 'Canto Grueso (ml)':5.5,
-  'Corredera Aluminio':18, 'Bisagra 35mm':3, 'Jalador metalico':4,
-}
-const precioRef = (nombre: string): number => PRECIOS_REF[nombre] ?? 10
 
 /** Fecha local Peru (UTC-5) — evita bug de toISOString que retorna UTC */
 const localDateStr = (): string => {
@@ -185,17 +172,7 @@ const CrearCotizacionTab: React.FC = () => {
       agregarServicio(
         `Tabiqueria Drywall ${fPared.medida} — ${fPared.largo}m x ${fPared.alto}m x ${fPared.caras} cara(s)`,
         area, 'm2', fPared.precio,
-        [
-          { material_nombre:`Plancha Drywall 1/2"`, cantidad:r.placas, unidad:'Unid', precio_unitario:precioRef('Plancha Drywall 1/2"'), es_manual:false },
-          { material_nombre:`Parante ${fPared.medida} (3m)`, cantidad:r.parantes, unidad:'Unid', precio_unitario:precioRef(`Parante ${fPared.medida} (3m)`), es_manual:false },
-          { material_nombre:`Riel ${r.rielMedida} (3m)`, cantidad:r.rieles, unidad:'Unid', precio_unitario:precioRef(`Riel ${r.rielMedida} (3m)`), es_manual:false },
-          ...(r.esquineros>0?[{ material_nombre:'Esquinero Metalico 2.44m', cantidad:r.esquineros, unidad:'Unid', precio_unitario:precioRef('Esquinero Metalico 2.44m'), es_manual:false as const }]:[]),
-          { material_nombre:'Cinta de Papel 75m', cantidad:r.cinta, unidad:'Rollo', precio_unitario:precioRef('Cinta de Papel 75m'), es_manual:false },
-          { material_nombre:'Masilla Drywall 5kg', cantidad:r.masilla, unidad:'Balde', precio_unitario:precioRef('Masilla Drywall 5kg'), es_manual:false },
-          { material_nombre:'Tornillos Punta Fina 1"', cantidad:r.tornillosPuntaFina, unidad:'Millar', precio_unitario:precioRef('Tornillos Punta Fina 1"'), es_manual:false },
-          { material_nombre:'Tornillos Punta Broca 1/2"', cantidad:r.tornillosPuntaBroca, unidad:'Unid', precio_unitario:precioRef('Tornillos Punta Broca 1/2"'), es_manual:false },
-          { material_nombre:'Anclajes (fulminante+clavo)', cantidad:r.anclajes, unidad:'Unid', precio_unitario:precioRef('Anclajes (fulminante+clavo)'), es_manual:false },
-        ]
+        armarInsumosPared(r),
       )
       addToast(`Area: ${area} m2 → ${r.placas} planchas, ${r.parantes} parantes, ${r.rieles} rieles`,'success')
       setFPared(f => ({ ...f, largo:'', alto:'', caras:1, esquineros:0 }))
@@ -210,18 +187,7 @@ const CrearCotizacionTab: React.FC = () => {
       agregarServicio(
         `Techo ${fTecho.cobertura} — ${fTecho.ancho}m x ${fTecho.largo}m (${fTecho.caida}% pendiente)`,
         area, 'm2', fTecho.precio,
-        [
-          { material_nombre:'Perfil Omega 3m', cantidad:r.perfilesOmega, unidad:'Unid', precio_unitario:precioRef('Perfil Omega 3m'), es_manual:false },
-          { material_nombre:'Parante/Colgante Techo', cantidad:r.parantesT, unidad:'Unid', precio_unitario:precioRef('Parante/Colgante Techo'), es_manual:false },
-          { material_nombre:'Riel Perimetral 3m', cantidad:r.rielestTecho, unidad:'Unid', precio_unitario:precioRef('Riel Perimetral 3m'), es_manual:false },
-          { material_nombre:`${fTecho.cobertura} 3.60m`, cantidad:r.calaminas, unidad:'Unid', precio_unitario:precioRef(`${fTecho.cobertura} 3.60m`), es_manual:false },
-          { material_nombre:'Tornillo Autoperforante 2"', cantidad:r.tornillosAutoPerf, unidad:'Unid', precio_unitario:precioRef('Tornillo Autoperforante 2"'), es_manual:false },
-          { material_nombre:'Tornillo Hex 5/16"', cantidad:r.tornillosHex, unidad:'Unid', precio_unitario:precioRef('Tornillo Hex 5/16"'), es_manual:false },
-          { material_nombre:'Masilla Selladora 300ml', cantidad:r.masillaSelladora, unidad:'Tubo', precio_unitario:precioRef('Masilla Selladora 300ml'), es_manual:false },
-          { material_nombre:'Cinta Aluminio 50mmx25m', cantidad:r.cintaAluminio, unidad:'Rollo', precio_unitario:precioRef('Cinta Aluminio 50mmx25m'), es_manual:false },
-          { material_nombre:'Anclajes (fulminante+clavo)', cantidad:r.anclajesEstructura, unidad:'Unid', precio_unitario:precioRef('Anclajes (fulminante+clavo)'), es_manual:false },
-          ...(fTecho.canaletas>0?[{ material_nombre:'Canaleta Metalica', cantidad:fTecho.canaletas, unidad:'ml', precio_unitario:precioRef('Canaleta Metalica'), es_manual:false as const }]:[]),
-        ]
+        armarInsumosTecho(r, fTecho.cobertura, fTecho.canaletas),
       )
       addToast(`Area: ${area} m2 → ${r.calaminas} calaminas, ${r.perfilesOmega} omegas`,'success')
       setFTecho(f => ({ ...f, ancho:'', largo:'', caida:15, canaletas:0 }))
@@ -235,14 +201,11 @@ const CrearCotizacionTab: React.FC = () => {
     agregarServicio(
       `Melamina ${fMel.grosor} ${acabado} — ${pl.toFixed(2)} plancha(s)`,
       pl, 'Plancha', fMel.precio,
-      [
-        { material_nombre:`Plancha Melamina ${fMel.grosor} ${acabado}`, cantidad:Math.ceil(pl), unidad:'Unid', precio_unitario:fMel.precio, es_manual:false },
-        ...(parseFloat(fMel.cantosD||'0')>0?[{ material_nombre:'Canto Delgado (ml)', cantidad:parseFloat(fMel.cantosD), unidad:'Metros', precio_unitario:precioRef('Canto Delgado (ml)'), es_manual:false as const }]:[]),
-        ...(parseFloat(fMel.cantosG||'0')>0?[{ material_nombre:'Canto Grueso (ml)', cantidad:parseFloat(fMel.cantosG), unidad:'Metros', precio_unitario:precioRef('Canto Grueso (ml)'), es_manual:false as const }]:[]),
-        ...(fMel.correderas>0?[{ material_nombre:'Corredera Aluminio', cantidad:fMel.correderas, unidad:'Unid', precio_unitario:precioRef('Corredera Aluminio'), es_manual:false as const }]:[]),
-        ...(fMel.bisagras>0?[{ material_nombre:'Bisagra 35mm', cantidad:fMel.bisagras, unidad:'Unid', precio_unitario:precioRef('Bisagra 35mm'), es_manual:false as const }]:[]),
-        ...(fMel.jaladores>0?[{ material_nombre:'Jalador metalico', cantidad:fMel.jaladores, unidad:'Unid', precio_unitario:precioRef('Jalador metalico'), es_manual:false as const }]:[]),
-      ]
+      armarInsumosMelamina({
+        grosor: fMel.grosor, acabado, planchas: pl, precioPlancha: fMel.precio,
+        cantosD: parseFloat(fMel.cantosD||'0'), cantosG: parseFloat(fMel.cantosG||'0'),
+        correderas: fMel.correderas, bisagras: fMel.bisagras, jaladores: fMel.jaladores,
+      }),
     )
     addToast(`Melamina: ${pl.toFixed(2)} planchas agregadas`,'success')
     setFMel(f => ({ ...f, planchas:'', cantosD:'', cantosG:'', correderas:0, bisagras:0, jaladores:0 }))

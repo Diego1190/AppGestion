@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { Inquilino, Contrato, MovimientoDepa } from '../types/index'
+import { calcularFechaFinalContrato, mesAnioAnterior, calcularConsumo } from './calculations'
 
 // INQUILINOS
 export const getInquilinos = async (): Promise<Inquilino[]> => {
@@ -39,10 +40,7 @@ export const getContratosPorInquilino = async (inquilinoId: string): Promise<Con
 }
 
 export const createContrato = async (contrato: Omit<Contrato, 'id' | 'fecha_final'>): Promise<Contrato> => {
-  // Calcular fecha final
-  const fechaInicio = new Date(contrato.fecha_inicio)
-  fechaInicio.setMonth(fechaInicio.getMonth() + contrato.meses_alquiler)
-  const fechaFinal = fechaInicio.toISOString().split('T')[0]
+  const fechaFinal = calcularFechaFinalContrato(contrato.fecha_inicio, contrato.meses_alquiler)
 
   const { data, error } = await supabase
     .from('contratos')
@@ -83,13 +81,7 @@ export const getMovimientosDepa = async (numDepa: number, mes?: number, anio?: n
 }
 
 export const getLecturaAnterior = async (numDepa: number, tipo: string, mes: number, anio: number): Promise<number | null> => {
-  // Obtener del mes anterior
-  let mesAnterior = mes - 1
-  let anioAnterior = anio
-  if (mesAnterior === 0) {
-    mesAnterior = 12
-    anioAnterior -= 1
-  }
+  const { mes: mesAnterior, anio: anioAnterior } = mesAnioAnterior(mes, anio)
 
   const { data, error } = await supabase
     .from('movimientos_depa')
@@ -112,13 +104,7 @@ export const createMovimiento = async (
   const anio = fecha.getFullYear()
 
   // Calcular consumo para Luz/Agua/Gas si tienen lecturas
-  let consumo: number | null = null
-  if (
-    movimiento.lectura_actual !== null && movimiento.lectura_actual !== undefined &&
-    movimiento.lectura_anterior !== null && movimiento.lectura_anterior !== undefined
-  ) {
-    consumo = movimiento.lectura_actual - movimiento.lectura_anterior
-  }
+  const consumo = calcularConsumo(movimiento.lectura_actual, movimiento.lectura_anterior)
 
   // El importe SIEMPRE viene del formulario (ya calculado correctamente):
   // - Alquiler: jalado del contrato en el componente
