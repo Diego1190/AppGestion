@@ -36,6 +36,16 @@ const InquilinosTab: React.FC = () => {
   useRealtimeSync(['inquilinos', 'contratos'], loadData)
 
   const contratoActivoPorInquilino = (inqId: string) => contratos.find(c => c.inquilino_id === inqId && c.activo)
+
+  /** Última garantía registrada para este inquilino (el contrato más reciente que tenga garantía
+   *  guardada, activo o cerrado). La garantía es del inquilino, no de cada renovación individual:
+   *  si ya pagó S/1200 al inicio, esa garantía sigue vigente en renovaciones futuras. */
+  const ultimaGarantiaPorInquilino = (inqId: string): number | null => {
+    const delInquilino = contratos
+      .filter(c => c.inquilino_id === inqId && c.garantia != null)
+      .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime())
+    return delInquilino[0]?.garantia ?? null
+  }
   const contratoActivoPorDepa = (numDepa: number) => {
     const inq = inquilinos.find(i => i.num_depa === numDepa)
     return inq ? contratoActivoPorInquilino(inq.id) : undefined
@@ -319,7 +329,11 @@ const InquilinosTab: React.FC = () => {
         <form onSubmit={handleCrearCon}>
           <div className="px-6 py-4 space-y-4">
             <div><label className="block text-sm font-medium mb-1">Inquilino</label>
-              <select className={inp} value={formCon.inquilino_id} onChange={e=>setFormCon({...formCon,inquilino_id:e.target.value})} required>
+              <select className={inp} value={formCon.inquilino_id}
+                onChange={e=>{
+                  const garantiaPrevia = ultimaGarantiaPorInquilino(e.target.value)
+                  setFormCon({...formCon, inquilino_id:e.target.value, garantia: garantiaPrevia != null ? String(garantiaPrevia) : formCon.garantia})
+                }} required>
                 <option value="">Seleccionar...</option>
                 {inquilinos.map(i=><option key={i.id} value={i.id}>{i.nombre_completo} (D{i.num_depa})</option>)}
               </select>
@@ -335,7 +349,7 @@ const InquilinosTab: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className="block text-sm font-medium mb-1">Importe Mensual (S/)</label><input type="number" step="0.01" min="0.01" className={inp} placeholder="0.00" value={formCon.importe_alquiler} onChange={e=>setFormCon({...formCon,importe_alquiler:e.target.value})} required/></div>
-              <div><label className="block text-sm font-medium mb-1">Garantía (S/) <span className="text-gray-400 font-normal">opcional</span></label><input type="number" step="0.01" min="0" className={inp} placeholder="0.00" value={formCon.garantia} onChange={e=>setFormCon({...formCon,garantia:e.target.value})}/></div>
+              <div><label className="block text-sm font-medium mb-1">Garantía (S/) <span className="text-gray-400 font-normal">se mantiene del contrato anterior si existe</span></label><input type="number" step="0.01" min="0" className={inp} placeholder="0.00" value={formCon.garantia} onChange={e=>setFormCon({...formCon,garantia:e.target.value})}/></div>
             </div>
           </div>
           <div className="px-6 py-4 border-t flex gap-2 justify-end"><button type="button" onClick={()=>setModalCon(false)} className="px-4 py-2 bg-gray-100 rounded-lg font-medium text-sm">Cancelar</button><button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm">Guardar</button></div>
