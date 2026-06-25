@@ -3,11 +3,15 @@ import { GastoPersonal, ControlVentaCasa } from '../types/index'
 import { validarPagoVentaCasa } from './calculations'
 
 // GASTOS PERSONALES
-export const getGastos = async (): Promise<GastoPersonal[]> => {
+/** Trae los gastos más próximos a vencer primero, con un tope explícito.
+ *  Igual razón que en getCotizaciones: evitar que la query crezca sin
+ *  límite con el tiempo de uso de la app. */
+export const getGastos = async (limite = 500): Promise<GastoPersonal[]> => {
   const { data, error } = await supabase
     .from('gastos_personales')
     .select('*')
     .order('fecha_vencimiento', { ascending: true })
+    .limit(limite)
   if (error) throw new Error(error.message)
   return data || []
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   calcularPared, calcularTecho, validarDNI, validarTelefono,
   precioRef, armarInsumosPared, armarInsumosTecho, armarInsumosMelamina,
-  generarCorrelativo,
+  generarCorrelativo, MAX_DIMENSION_M,
 } from '../calculations'
 
 // ============================================================
@@ -65,6 +65,15 @@ describe('calcularPared', () => {
     expect(r.masilla).toBeGreaterThanOrEqual(1)
     expect(r.tornillosPuntaFina).toBeGreaterThanOrEqual(1)
   })
+
+  it('rechaza dimensiones que exceden el límite razonable (probable error de tecleo)', () => {
+    expect(() => calcularPared(MAX_DIMENSION_M + 1, 2.5, 1)).toThrow('fuera de rango')
+    expect(() => calcularPared(3, MAX_DIMENSION_M + 1, 1)).toThrow('fuera de rango')
+  })
+
+  it('acepta exactamente el límite máximo de dimensión', () => {
+    expect(() => calcularPared(MAX_DIMENSION_M, 2.5, 1)).not.toThrow()
+  })
 })
 
 // ============================================================
@@ -107,6 +116,11 @@ describe('calcularTecho', () => {
     [-1, 6],
   ])('rechaza dimensiones inválidas (ancho=%s, largo=%s)', (ancho, largo) => {
     expect(() => calcularTecho(ancho, largo, 'Calamina')).toThrow('Dimensiones invalidas')
+  })
+
+  it('rechaza dimensiones que exceden el límite razonable (probable error de tecleo)', () => {
+    expect(() => calcularTecho(MAX_DIMENSION_M + 1, 6, 'Calamina')).toThrow('fuera de rango')
+    expect(() => calcularTecho(4, MAX_DIMENSION_M + 1, 'Calamina')).toThrow('fuera de rango')
   })
 })
 

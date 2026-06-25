@@ -6,6 +6,7 @@ import { MovimientoDepa, Inquilino, Contrato } from '@/types/index'
 import { useToast, ToastContainer, ConfirmModal } from '@/components/Toast'
 import { inputClass } from '@/components/ui/inputStyles'
 import { Modal } from '@/components/ui/Modal'
+import { MONTO_MAXIMO_RAZONABLE } from '@/lib/calculations'
 
 const SERVICIOS = ['Alquiler', 'Luz', 'Agua', 'Internet', 'Gas', 'Otro'] as const
 type Servicio = typeof SERVICIOS[number]
@@ -102,6 +103,7 @@ const MovimientosTab: React.FC = () => {
     e.preventDefault()
     if (form.num_depa === '') { addToast('Selecciona un departamento', 'error'); return }
     if (!form.importe_pagar || parseFloat(form.importe_pagar) <= 0) { addToast('Ingresa un importe mayor a 0', 'error'); return }
+    if (parseFloat(form.importe_pagar) > MONTO_MAXIMO_RAZONABLE) { addToast(`El importe parece demasiado alto (más de S/ ${MONTO_MAXIMO_RAZONABLE}). Verifica que no sea un error de tecleo.`, 'error'); return }
     try {
       await createMovimiento({
         num_depa: form.num_depa as number,

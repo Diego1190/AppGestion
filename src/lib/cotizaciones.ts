@@ -32,8 +32,17 @@ export const deleteServicio = async (id: string): Promise<void> => {
 }
 
 // COTIZACIONES
-export const getCotizaciones = async (): Promise<Cotizacion[]> => {
-  const { data, error } = await supabase.from('cotizaciones').select('*')
+/** Trae las cotizaciones más recientes primero, con un tope explícito.
+ *  Antes traía absolutamente toda la historia sin filtro ni límite —
+ *  con meses de uso eso se vuelve cada vez más lento y, al llegar al
+ *  límite duro de Supabase (1000 filas), empezaría a perder registros
+ *  antiguos sin ningún aviso. */
+export const getCotizaciones = async (limite = 200): Promise<Cotizacion[]> => {
+  const { data, error } = await supabase
+    .from('cotizaciones')
+    .select('*')
+    .order('fecha_emision', { ascending: false })
+    .limit(limite)
   if (error) throw error
   return data || []
 }

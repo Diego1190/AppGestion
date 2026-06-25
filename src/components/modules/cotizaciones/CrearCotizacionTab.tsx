@@ -376,8 +376,8 @@ const CrearCotizacionTab: React.FC = () => {
               <span className="text-xs text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded">2 caras = doble placa, misma estructura</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-3">
-              <div><label className="block text-[11px] font-medium mb-1">Largo (m)</label><input type="number" step="0.01" className={inp} value={fPared.largo} onChange={e=>setFPared({...fPared,largo:e.target.value})}/></div>
-              <div><label className="block text-[11px] font-medium mb-1">Alto (m)</label><input type="number" step="0.01" className={inp} value={fPared.alto} onChange={e=>setFPared({...fPared,alto:e.target.value})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Largo (m)</label><input type="number" step="0.01" min="0.1" max="50" className={inp} value={fPared.largo} onChange={e=>setFPared({...fPared,largo:e.target.value})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Alto (m)</label><input type="number" step="0.01" min="0.1" max="50" className={inp} value={fPared.alto} onChange={e=>setFPared({...fPared,alto:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Medida</label><select className={inp} value={fPared.medida} onChange={e=>setFPared({...fPared,medida:e.target.value as MedidaParante})}><option value="38mm">38mm</option><option value="64mm">64mm</option><option value="89mm">89mm</option></select></div>
               <div><label className="block text-[11px] font-medium mb-1">Caras</label><select className={inp} value={fPared.caras} onChange={e=>setFPared({...fPared,caras:parseInt(e.target.value)})}><option value={1}>1 cara</option><option value={2}>2 caras</option></select></div>
               <div><label className="block text-[11px] font-medium mb-1">Esquineros</label><input type="number" min="0" className={inp} value={fPared.esquineros} onChange={e=>setFPared({...fPared,esquineros:parseInt(e.target.value)||0})}/></div>
@@ -392,8 +392,8 @@ const CrearCotizacionTab: React.FC = () => {
           <div className="bg-sky-50 rounded-xl p-4 mb-3 border border-sky-100">
             <span className="text-sm font-semibold text-sky-800 block mb-3">📐 Techos y Coberturas</span>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-3">
-              <div><label className="block text-[11px] font-medium mb-1">Ancho (m)</label><input type="number" step="0.01" className={inp} value={fTecho.ancho} onChange={e=>setFTecho({...fTecho,ancho:e.target.value})}/></div>
-              <div><label className="block text-[11px] font-medium mb-1">Largo (m)</label><input type="number" step="0.01" className={inp} value={fTecho.largo} onChange={e=>setFTecho({...fTecho,largo:e.target.value})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Ancho (m)</label><input type="number" step="0.01" min="0.1" max="50" className={inp} value={fTecho.ancho} onChange={e=>setFTecho({...fTecho,ancho:e.target.value})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Largo (m)</label><input type="number" step="0.01" min="0.1" max="50" className={inp} value={fTecho.largo} onChange={e=>setFTecho({...fTecho,largo:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Cobertura</label><select className={inp} value={fTecho.cobertura} onChange={e=>setFTecho({...fTecho,cobertura:e.target.value})}><option>Calamina</option><option>Eternit</option><option>Polipropileno</option></select></div>
               <div><label className="block text-[11px] font-medium mb-1">Pendiente %</label><input type="number" min="0" max="100" className={inp} value={fTecho.caida} onChange={e=>setFTecho({...fTecho,caida:parseInt(e.target.value)||0})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Canaletas ml</label><input type="number" min="0" className={inp} value={fTecho.canaletas} onChange={e=>setFTecho({...fTecho,canaletas:parseInt(e.target.value)||0})}/></div>

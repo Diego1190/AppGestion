@@ -5,6 +5,7 @@ import { GastoPersonal } from '@/types/index'
 import { useToast, ToastContainer, ConfirmModal } from '@/components/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
+import { MONTO_MAXIMO_RAZONABLE } from '@/lib/calculations'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -47,6 +48,7 @@ const GastosTab: React.FC = () => {
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editItem) return
+    if (editItem.monto > MONTO_MAXIMO_RAZONABLE) { addToast(`El monto parece demasiado alto (más de S/ ${MONTO_MAXIMO_RAZONABLE}). Verifica que no sea un error de tecleo.`,'error'); return }
     try {
       await updateGasto(editItem.id, { concepto: editItem.concepto, fecha_vencimiento: editItem.fecha_vencimiento, monto: editItem.monto, estado: editItem.estado })
       setEditItem(null); addToast('Gasto actualizado','success'); loadGastos()
@@ -56,6 +58,7 @@ const GastosTab: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.monto || parseFloat(form.monto) <= 0) { addToast('Ingresa un monto válido','error'); return }
+    if (parseFloat(form.monto) > MONTO_MAXIMO_RAZONABLE) { addToast(`El monto parece demasiado alto (más de S/ ${MONTO_MAXIMO_RAZONABLE}). Verifica que no sea un error de tecleo.`,'error'); return }
     try {
       await createGasto({ concepto:form.concepto, fecha_vencimiento:form.fecha_vencimiento, monto:parseFloat(form.monto), estado:form.estado })
       setForm({ concepto:'', fecha_vencimiento:'', monto:'', estado:'Pendiente' })
@@ -223,7 +226,7 @@ const GastosTab: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Monto (S/)</label>
-                  <input type="number" step="0.01" min="0.01" className={inp} placeholder="0.00"
+                  <input type="number" step="0.01" min="0.01" max="50000" className={inp} placeholder="0.00"
                     value={form.monto} onChange={e=>setForm({...form,monto:e.target.value})} required/>
                 </div>
               </div>
@@ -266,7 +269,7 @@ const GastosTab: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Monto (S/)</label>
-                    <input type="number" step="0.01" min="0.01" className={inp} value={editItem.monto}
+                    <input type="number" step="0.01" min="0.01" max="50000" className={inp} value={editItem.monto}
                       onChange={e=>setEditItem({...editItem,monto:parseFloat(e.target.value)||0})} required/>
                   </div>
                 </div>

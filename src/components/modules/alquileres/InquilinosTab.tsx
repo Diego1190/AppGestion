@@ -6,7 +6,7 @@ import { Inquilino, Contrato } from '@/types/index'
 import { useToast, ToastContainer, ConfirmModal, FieldError } from '@/components/Toast'
 import { inputClass } from '@/components/ui/inputStyles'
 import { Modal, ModalBody, ModalFooter } from '@/components/ui/Modal'
-import { validarDNI, validarTelefono } from '@/lib/calculations'
+import { validarDNI, validarTelefono, MONTO_MAXIMO_RAZONABLE } from '@/lib/calculations'
 
 const InquilinosTab: React.FC = () => {
   const [inquilinos, setInquilinos] = useState<Inquilino[]>([])
@@ -82,6 +82,7 @@ const InquilinosTab: React.FC = () => {
   const handleCrearCon = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formCon.importe_alquiler || parseFloat(formCon.importe_alquiler) <= 0) { addToast('El importe debe ser mayor a 0', 'error'); return }
+    if (parseFloat(formCon.importe_alquiler) > MONTO_MAXIMO_RAZONABLE) { addToast(`El importe parece demasiado alto (más de S/ ${MONTO_MAXIMO_RAZONABLE}). Verifica que no sea un error de tecleo.`, 'error'); return }
 
     const conActivo = contratoActivoPorInquilino(formCon.inquilino_id)
     if (conActivo && !contratoExpirado(conActivo)) {
@@ -348,7 +349,7 @@ const InquilinosTab: React.FC = () => {
               <div><label className="block text-sm font-medium mb-1">Meses</label><input type="number" min={1} className={inp} value={formCon.meses_alquiler} onChange={e=>setFormCon({...formCon,meses_alquiler:parseInt(e.target.value)})} required/></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><label className="block text-sm font-medium mb-1">Importe Mensual (S/)</label><input type="number" step="0.01" min="0.01" className={inp} placeholder="0.00" value={formCon.importe_alquiler} onChange={e=>setFormCon({...formCon,importe_alquiler:e.target.value})} required/></div>
+              <div><label className="block text-sm font-medium mb-1">Importe Mensual (S/)</label><input type="number" step="0.01" min="0.01" max="50000" className={inp} placeholder="0.00" value={formCon.importe_alquiler} onChange={e=>setFormCon({...formCon,importe_alquiler:e.target.value})} required/></div>
               <div><label className="block text-sm font-medium mb-1">Garantía (S/) <span className="text-gray-400 font-normal">se mantiene del contrato anterior si existe</span></label><input type="number" step="0.01" min="0" className={inp} placeholder="0.00" value={formCon.garantia} onChange={e=>setFormCon({...formCon,garantia:e.target.value})}/></div>
             </div>
           </div>

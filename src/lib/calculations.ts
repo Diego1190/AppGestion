@@ -19,6 +19,12 @@ const METROS_POR_ROLLO_CINTA  = 15     // cinta aluminio 50mm x 25m
 
 export type MedidaParante = '38mm' | '64mm' | '89mm'
 
+/** Límite superior razonable para una sola dimensión (largo/alto/ancho) en metros.
+ *  No es una limitación física real, es una red de seguridad contra errores de
+ *  tecleo (ej. escribir "300" en vez de "3.00"), que de otro modo generarían una
+ *  cotización con cientos de planchas sin que nadie lo note hasta después. */
+export const MAX_DIMENSION_M = 50
+
 const RIEL_COMPAT: Record<MedidaParante, string> = {
   '38mm': '39mm', '64mm': '65mm', '89mm': '90mm',
 }
@@ -42,6 +48,8 @@ export const calcularPared = (
 ): CalculoPared => {
   if (largo <= 0 || alto <= 0 || caras < 1)
     throw new Error('Dimensiones invalidas')
+  if (largo > MAX_DIMENSION_M || alto > MAX_DIMENSION_M)
+    throw new Error(`Dimension fuera de rango (maximo ${MAX_DIMENSION_M}m). Verifica que no sea un error de tecleo.`)
 
   const area          = largo * alto * caras
   const placas        = Math.ceil((area / PLANCHA_AREA_M2) * (1 + desperdicio))
@@ -80,6 +88,8 @@ export const calcularTecho = (
 ): CalculoTecho => {
   if (ancho <= 0 || largo <= 0)
     throw new Error('Dimensiones invalidas')
+  if (ancho > MAX_DIMENSION_M || largo > MAX_DIMENSION_M)
+    throw new Error(`Dimension fuera de rango (maximo ${MAX_DIMENSION_M}m). Verifica que no sea un error de tecleo.`)
 
   const perimetro       = 2 * (ancho + largo)
   const area            = ancho * largo
@@ -113,6 +123,12 @@ export const generarCorrelativo = (): string => {
   const rand = String(Math.floor(Math.random() * 1000)).padStart(3, '0')
   return `${yy}${mm}${dd}-${rand}`
 }
+
+/** Tope máximo razonable para un monto individual (alquiler, gasto, importe de movimiento).
+ *  No es un límite legal ni de negocio real, es una red de seguridad contra errores de
+ *  tecleo (ej. escribir "120000" en vez de "1200"), que de otro modo aparecerían
+ *  directamente en un recibo o cotización sin que nadie los note a tiempo. */
+export const MONTO_MAXIMO_RAZONABLE = 50000
 
 export const validarDNI = (dni: string): string | null =>
   /^\d{8}$/.test(dni) ? null : 'El DNI debe tener exactamente 8 digitos numericos'

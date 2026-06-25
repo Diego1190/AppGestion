@@ -4,7 +4,7 @@ import { getControlVenta, createControlVenta, updateControlVenta, deleteControlV
 import { ControlVentaCasa } from '@/types/index'
 import { inputClass } from '@/components/ui/inputStyles'
 import { Modal } from '@/components/ui/Modal'
-import { useToast, ToastContainer } from '@/components/Toast'
+import { useToast, ToastContainer, ConfirmModal } from '@/components/Toast'
 
 const TOPE = 6660
 const TOTAL_VENTA = 20000
@@ -26,6 +26,7 @@ const VentaCasaTab: React.FC = () => {
   const [showModal,  setShowModal]  = useState(false)
   const [editPago,   setEditPago]   = useState<any | null>(null)
   const [error, setError] = useState('')
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const { toasts, addToast, removeToast } = useToast()
   const [formData, setFormData] = useState({
     fecha_pago: '',
@@ -92,8 +93,7 @@ const VentaCasaTab: React.FC = () => {
   }
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Eliminar este pago?')) return
-    try { await deleteControlVenta(id); loadData() }
+    try { await deleteControlVenta(id); setConfirmId(null); loadData() }
     catch (e: any) { addToast(e.message || 'Error eliminando', 'error') }
   }
 
@@ -110,6 +110,8 @@ const VentaCasaTab: React.FC = () => {
   return (
     <div>
       <ToastContainer toasts={toasts} onClose={removeToast} />
+      <ConfirmModal open={!!confirmId} titulo="Eliminar Pago" mensaje="¿Eliminar este pago registrado? Esta acción no se puede deshacer." tipo="danger"
+        onConfirm={() => confirmId && handleDelete(confirmId)} onCancel={() => setConfirmId(null)} />
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-red-700 text-sm">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -204,7 +206,7 @@ const VentaCasaTab: React.FC = () => {
                     className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(pago.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Eliminar">
+                  <button onClick={() => setConfirmId(pago.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg" title="Eliminar">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -254,7 +256,7 @@ const VentaCasaTab: React.FC = () => {
                           className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(pago.id)}
+                        <button onClick={() => setConfirmId(pago.id)}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
