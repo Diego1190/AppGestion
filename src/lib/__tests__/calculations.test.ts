@@ -3,6 +3,7 @@ import {
   calcularPared, calcularTecho, validarDNI, validarTelefono,
   precioRef, armarInsumosPared, armarInsumosTecho, armarInsumosMelamina,
   generarCorrelativo, MAX_DIMENSION_M,
+  calcularPliegosLija, armarInsumoLijado, calcularGalonesPintura, armarInsumoPintura,
 } from '../calculations'
 
 // ============================================================
@@ -202,6 +203,54 @@ describe('armarInsumosTecho', () => {
     const conCanaletas = armarInsumosTecho(r, 'Calamina', 12)
     expect(sinCanaletas.some(i => i.material_nombre === 'Canaleta Metalica')).toBe(false)
     expect(conCanaletas.some(i => i.material_nombre === 'Canaleta Metalica')).toBe(true)
+  })
+})
+
+// ============================================================
+// Acabados opcionales — lijado y pintura, calculados a partir
+// del área de un servicio ya cotizado (Pared o Techo)
+// ============================================================
+describe('calcularPliegosLija', () => {
+  it('1 pliego cubre 5 m2, redondeando hacia arriba', () => {
+    expect(calcularPliegosLija(7.5)).toBe(2)   // 7.5/5 = 1.5 → 2
+    expect(calcularPliegosLija(30)).toBe(6)    // exacto
+  })
+  it('nunca devuelve menos de 1 pliego, aunque el área sea muy pequeña', () => {
+    expect(calcularPliegosLija(0.5)).toBe(1)
+  })
+})
+
+describe('armarInsumoLijado', () => {
+  it('usa el grano elegido en el nombre del material', () => {
+    const insumo = armarInsumoLijado(7.5, '80')
+    expect(insumo.material_nombre).toBe('Lija Grano 80')
+    expect(insumo.cantidad).toBe(2)
+    expect(insumo.unidad).toBe('Pliego')
+    expect(insumo.es_manual).toBe(false)
+  })
+})
+
+describe('calcularGalonesPintura', () => {
+  it('rinde 32 m2 por galón y por mano', () => {
+    expect(calcularGalonesPintura(40, 2)).toBe(3)  // (40*2)/32 = 2.5 → 3
+    expect(calcularGalonesPintura(5, 1)).toBe(1)
+  })
+  it('nunca devuelve menos de 1 galón', () => {
+    expect(calcularGalonesPintura(1, 1)).toBe(1)
+  })
+  it('a más manos, se necesita más pintura para la misma área', () => {
+    const unaM = calcularGalonesPintura(40, 1)
+    const dosM = calcularGalonesPintura(40, 2)
+    expect(dosM).toBeGreaterThanOrEqual(unaM)
+  })
+})
+
+describe('armarInsumoPintura', () => {
+  it('usa el tipo de pintura elegido en el nombre del material', () => {
+    const insumo = armarInsumoPintura(40, 2, 'Latex')
+    expect(insumo.material_nombre).toBe('Pintura Latex')
+    expect(insumo.cantidad).toBe(3)
+    expect(insumo.unidad).toBe('Galon')
   })
 })
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, ToggleLeft, ToggleRight, Calculator, Package, Lock } from 'lucide-react'
+import { Plus, Trash2, ToggleLeft, ToggleRight, Calculator, Package, Lock, Paintbrush, Sparkles } from 'lucide-react'
 import { getCatalogo, createCotizacion, createDetalles, createInsumos } from '@/lib/cotizaciones'
 import {
   generarCorrelativo, calcularPared, calcularTecho, validarTelefono, MedidaParante,
   armarInsumosPared, armarInsumosTecho, armarInsumosMelamina,
+  armarInsumoLijado, armarInsumoPintura, GRANOS_LIJA, GranoLija,
 } from '@/lib/calculations'
 import { CatalogoServicio } from '@/types/index'
 import { useToast, ToastContainer, FieldError } from '@/components/Toast'
@@ -80,6 +81,14 @@ const CrearCotizacionTab: React.FC = () => {
 
   const [fPared, setFPared] = useState({ largo:'', alto:'', caras:1, esquineros:0, medida:'64mm' as MedidaParante, precio:45 })
   const [fTecho, setFTecho] = useState({ ancho:'', largo:'', cobertura:'Calamina', caida:15, canaletas:0, precio:55 })
+
+  // Área del último servicio de Pared o Techo calculado, para que el panel
+  // de Acabados (lijado/pintura) pueda usarla sin que el usuario la reescriba.
+  const [ultimaArea, setUltimaArea] = useState<{ area: number; origen: string } | null>(null)
+  const [fAcabados, setFAcabados] = useState({
+    lijado: false, grano: 'Variado' as GranoLija,
+    pintura: false, manos: 2, tipoPintura: 'Latex',
+  })
   const [fMel,   setFMel]   = useState({ planchas:'', grosor:'18mm', acabado:'Blanco', acabadoCustom:'', cantosD:'', cantosG:'', correderas:0, bisagras:0, jaladores:0, precio:85 })
   const [fEsp,   setFEsp]   = useState({ tipo:'Pintura', m2:'', puntos:'', precio:15 })
 
@@ -163,6 +172,30 @@ const CrearCotizacionTab: React.FC = () => {
     setInsumos(p => [...p, ...nuevosInsumos.map((ins, i) => ({ ...ins, id:`${id}_${i}`, linea_id:id }))])
   }
 
+  // ── Acabados opcionales (lijado, pintura) ──────────────────────
+  // Se suman como insumos sueltos (linea_id:'acabados'), no como una
+  // línea de servicio nueva: el área ya fue cobrada en Pared/Techo,
+  // aquí solo se agrega el costo de material del acabado elegido.
+  const aplicarAcabados = () => {
+    if (!ultimaArea) { addToast('Primero calcula una Pared o Techo','error'); return }
+    if (!fAcabados.lijado && !fAcabados.pintura) { addToast('Selecciona al menos un acabado','error'); return }
+
+    // Si ya había acabados aplicados, los reemplaza (evita duplicar si el usuario ajusta y vuelve a aplicar)
+    setInsumos(p => p.filter(i => i.linea_id !== 'acabados'))
+
+    const nuevos: Omit<InsumoInterno, 'id'|'linea_id'>[] = []
+    if (fAcabados.lijado) nuevos.push(armarInsumoLijado(ultimaArea.area, fAcabados.grano))
+    if (fAcabados.pintura) nuevos.push(armarInsumoPintura(ultimaArea.area, fAcabados.manos, fAcabados.tipoPintura))
+
+    setInsumos(p => [...p, ...nuevos.map((ins, i) => ({ ...ins, id:`acabados_${Date.now()}_${i}`, linea_id:'acabados' }))])
+    addToast(`Acabados agregados para ${ultimaArea.area} m2 (${ultimaArea.origen})`,'success')
+  }
+
+  const quitarAcabados = () => {
+    setInsumos(p => p.filter(i => i.linea_id !== 'acabados'))
+    setFAcabados({ lijado:false, grano:'Variado', pintura:false, manos:2, tipoPintura:'Latex' })
+  }
+
   // ── Calculadoras ─────────────────────────────────────────────
   const calcParedes = () => {
     if (!fPared.largo || !fPared.alto) { addToast('Ingresa largo y alto','error'); return }
@@ -175,6 +208,7 @@ const CrearCotizacionTab: React.FC = () => {
         armarInsumosPared(r),
       )
       addToast(`Area: ${area} m2 → ${r.placas} planchas, ${r.parantes} parantes, ${r.rieles} rieles`,'success')
+      setUltimaArea({ area, origen: 'Pared' })
       setFPared(f => ({ ...f, largo:'', alto:'', caras:1, esquineros:0 }))
     } catch (err: any) { addToast(err.message,'error') }
   }
@@ -190,6 +224,7 @@ const CrearCotizacionTab: React.FC = () => {
         armarInsumosTecho(r, fTecho.cobertura, fTecho.canaletas),
       )
       addToast(`Area: ${area} m2 → ${r.calaminas} calaminas, ${r.perfilesOmega} omegas`,'success')
+      setUltimaArea({ area, origen: 'Techo' })
       setFTecho(f => ({ ...f, ancho:'', largo:'', caida:15, canaletas:0 }))
     } catch (err: any) { addToast(err.message,'error') }
   }
@@ -306,6 +341,7 @@ const CrearCotizacionTab: React.FC = () => {
       addToast(`Cotizacion ${correlativo} guardada en Historial`,'success')
       // Reset
       setLineas([]); setInsumos([]); setPreciosEdit(false)
+      setUltimaArea(null); setFAcabados({ lijado:false, grano:'Variado', pintura:false, manos:2, tipoPintura:'Latex' })
       setCliente({ nombre:'',telefono:'',empresa:'',proyecto:'',direccion:'',distrito:'',desgaste:0,incluye_materiales:true })
       setCondiciones(CONDICIONES_DEFAULT); setTiempoEstimado('')
       setMParedes(false); setMTechos(false); setMMelamina(false); setMEsp(false)
@@ -400,6 +436,59 @@ const CrearCotizacionTab: React.FC = () => {
               <div><label className="block text-[11px] font-medium mb-1 text-sky-600">Precio m2</label><input type="number" step="0.01" className={inp} value={fTecho.precio} onChange={e=>setFTecho({...fTecho,precio:parseFloat(e.target.value)||0})}/></div>
             </div>
             <button onClick={calcTechos} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><Calculator className="w-4 h-4"/>Agregar Servicio</button>
+          </div>
+        )}
+
+        {ultimaArea && (
+          <div className="bg-teal-50 rounded-xl p-4 mb-3 border border-teal-100">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold text-teal-800 flex items-center gap-1.5"><Sparkles className="w-4 h-4"/>Acabados Adicionales</span>
+              <span className="text-xs text-teal-600 bg-teal-100 px-2 py-0.5 rounded">Usa el área de {ultimaArea.origen}: {ultimaArea.area} m2</span>
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 accent-teal-600" checked={fAcabados.lijado}
+                  onChange={e=>setFAcabados({...fAcabados, lijado:e.target.checked})}/>
+                <span className="text-sm font-medium text-teal-900">Lijado</span>
+              </label>
+              {fAcabados.lijado && (
+                <div className="ml-6 flex items-center gap-2">
+                  <label className="text-xs text-gray-600">Grano:</label>
+                  <select className={`${inp} w-32`} value={fAcabados.grano} onChange={e=>setFAcabados({...fAcabados,grano:e.target.value as GranoLija})}>
+                    {GRANOS_LIJA.map(g=><option key={g} value={g}>{g}</option>)}
+                  </select>
+                  <span className="text-xs text-gray-500">{Math.max(1,Math.ceil(ultimaArea.area/5))} pliego(s) sugeridos</span>
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 accent-teal-600" checked={fAcabados.pintura}
+                  onChange={e=>setFAcabados({...fAcabados, pintura:e.target.checked})}/>
+                <span className="text-sm font-medium text-teal-900 flex items-center gap-1"><Paintbrush className="w-3.5 h-3.5"/>Pintura</span>
+              </label>
+              {fAcabados.pintura && (
+                <div className="ml-6 flex items-center gap-2 flex-wrap">
+                  <label className="text-xs text-gray-600">Tipo:</label>
+                  <select className={`${inp} w-28`} value={fAcabados.tipoPintura} onChange={e=>setFAcabados({...fAcabados,tipoPintura:e.target.value})}>
+                    <option value="Latex">Latex</option><option value="Oleo">Óleo</option><option value="Anticorrosiva">Anticorrosiva</option>
+                  </select>
+                  <label className="text-xs text-gray-600">Manos:</label>
+                  <select className={`${inp} w-16`} value={fAcabados.manos} onChange={e=>setFAcabados({...fAcabados,manos:parseInt(e.target.value)})}>
+                    <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
+                  </select>
+                  <span className="text-xs text-gray-500">{Math.max(1,Math.ceil((ultimaArea.area*fAcabados.manos)/32))} galón(es) sugeridos</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 mt-3">
+              <button onClick={aplicarAcabados} className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><Plus className="w-4 h-4"/>Agregar Acabados</button>
+              {insumos.some(i=>i.linea_id==='acabados') && (
+                <button onClick={quitarAcabados} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium">Quitar</button>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2">Las cantidades son aproximadas según rendimiento estándar; ajústalas en la lista de materiales si lo necesitas.</p>
           </div>
         )}
 

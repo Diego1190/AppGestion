@@ -16,6 +16,8 @@ const LARGO_EFECT_CALAMINA    = 3.40    // 3.60 - 0.20 traslape longitudinal
 const TORNILLOS_POR_HOJA      = 8
 const HOJAS_POR_TUBO_MASILLA  = 8
 const METROS_POR_ROLLO_CINTA  = 15     // cinta aluminio 50mm x 25m
+const M2_POR_PLIEGO_LIJA      = 5      // 1 pliego de lija cubre ~5 m2
+const M2_POR_GALON_PINTURA    = 32     // promedio 30-35 m2 por mano, latex estandar
 
 export type MedidaParante = '38mm' | '64mm' | '89mm'
 
@@ -224,6 +226,9 @@ export const PRECIOS_REF: Record<string, number> = {
   'Masilla Selladora 300ml':12, 'Cinta Aluminio 50mmx25m':18,
   'Canaleta Metalica':12, 'Canto Delgado (ml)':3.5, 'Canto Grueso (ml)':5.5,
   'Corredera Aluminio':18, 'Bisagra 35mm':3, 'Jalador metalico':4,
+  'Lija Grano 80':3.5, 'Lija Grano 100':3.5, 'Lija Grano 120':3.5,
+  'Lija Grano 150':3.5, 'Lija Grano 180':3.5, 'Lija Grano Variado':3.5,
+  'Pintura Latex':55, 'Pintura Oleo':70, 'Pintura Anticorrosiva':85,
 }
 
 export const precioRef = (nombre: string): number => PRECIOS_REF[nombre] ?? 10
@@ -277,3 +282,41 @@ export const armarInsumosMelamina = (f: MelaminaForm): InsumoCalculado[] => [
   ...(f.bisagras>0?[{ material_nombre:'Bisagra 35mm', cantidad:f.bisagras, unidad:'Unid', precio_unitario:precioRef('Bisagra 35mm'), es_manual:false as const }]:[]),
   ...(f.jaladores>0?[{ material_nombre:'Jalador metalico', cantidad:f.jaladores, unidad:'Unid', precio_unitario:precioRef('Jalador metalico'), es_manual:false as const }]:[]),
 ]
+
+// ============================================================
+// ACABADOS OPCIONALES — lijado y pintura, calculados a partir
+// del área ya obtenida de un servicio (Pared o Techo).
+//
+// A diferencia de los insumos de Pared/Techo (que siempre van),
+// estos son opcionales: el usuario decide si el trabajo incluye
+// o no lijado/pintura, y con cuántas manos. Por eso viven como
+// funciones separadas en vez de ir mezclados en armarInsumosPared.
+// ============================================================
+
+/** Granos de lija más comunes en obra; "Variado" cuando se usan varias etapas */
+export const GRANOS_LIJA = ['80', '100', '120', '150', '180', 'Variado'] as const
+export type GranoLija = typeof GRANOS_LIJA[number]
+
+/** Pliegos de lija sugeridos para lijar un área determinada (redondeado hacia arriba) */
+export const calcularPliegosLija = (areaM2: number): number =>
+  Math.max(1, Math.ceil(areaM2 / M2_POR_PLIEGO_LIJA))
+
+export const armarInsumoLijado = (areaM2: number, grano: GranoLija): InsumoCalculado => ({
+  material_nombre: `Lija Grano ${grano}`,
+  cantidad: calcularPliegosLija(areaM2),
+  unidad: 'Pliego',
+  precio_unitario: precioRef(`Lija Grano ${grano}`),
+  es_manual: false,
+})
+
+/** Galones de pintura sugeridos para un área y número de manos (redondeado hacia arriba) */
+export const calcularGalonesPintura = (areaM2: number, manos: number): number =>
+  Math.max(1, Math.ceil((areaM2 * manos) / M2_POR_GALON_PINTURA))
+
+export const armarInsumoPintura = (areaM2: number, manos: number, tipoPintura: string): InsumoCalculado => ({
+  material_nombre: `Pintura ${tipoPintura}`,
+  cantidad: calcularGalonesPintura(areaM2, manos),
+  unidad: 'Galon',
+  precio_unitario: precioRef(`Pintura ${tipoPintura}`),
+  es_manual: false,
+})
