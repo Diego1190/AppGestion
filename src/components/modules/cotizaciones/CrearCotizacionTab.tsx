@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, ToggleLeft, ToggleRight, Calculator, Package, Lock, Paintbrush, Sparkles } from 'lucide-react'
+import { Plus, Trash2, ToggleLeft, ToggleRight, Calculator, Package, Lock, Star, X } from 'lucide-react'
 import { getCatalogo, createCotizacion, createDetalles, createInsumos } from '@/lib/cotizaciones'
+import { getMaterialesExtra, createMaterialExtra, deleteMaterialExtra } from '@/lib/materialesExtra'
 import {
   generarCorrelativo, calcularPared, calcularTecho, validarTelefono, MedidaParante,
   armarInsumosPared, armarInsumosTecho, armarInsumosMelamina,
-  armarInsumoLijado, armarInsumoPintura, GRANOS_LIJA, GranoLija,
 } from '@/lib/calculations'
-import { CatalogoServicio } from '@/types/index'
+import { CatalogoServicio, MaterialExtraServicio } from '@/types/index'
 import { useToast, ToastContainer, FieldError } from '@/components/Toast'
 import { inputClass } from '@/components/ui/inputStyles'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 
 // ── Tipos ────────────────────────────────────────────────────
 interface LineaServicio {
@@ -81,16 +82,26 @@ const CrearCotizacionTab: React.FC = () => {
 
   const [fPared, setFPared] = useState({ largo:'', alto:'', caras:1, esquineros:0, medida:'64mm' as MedidaParante, precio:45 })
   const [fTecho, setFTecho] = useState({ ancho:'', largo:'', cobertura:'Calamina', caida:15, canaletas:0, precio:55 })
-
-  // Área del último servicio de Pared o Techo calculado, para que el panel
-  // de Acabados (lijado/pintura) pueda usarla sin que el usuario la reescriba.
-  const [ultimaArea, setUltimaArea] = useState<{ area: number; origen: string } | null>(null)
-  const [fAcabados, setFAcabados] = useState({
-    lijado: false, grano: 'Variado' as GranoLija,
-    pintura: false, manos: 2, tipoPintura: 'Latex',
-  })
   const [fMel,   setFMel]   = useState({ planchas:'', grosor:'18mm', acabado:'Blanco', acabadoCustom:'', cantosD:'', cantosG:'', correderas:0, bisagras:0, jaladores:0, precio:85 })
   const [fEsp,   setFEsp]   = useState({ tipo:'Pintura', m2:'', puntos:'', precio:15 })
+
+  // Materiales extra guardados por tipo de servicio: se auto-incluyen cada vez
+  // que se agrega ese servicio a la cotización, sin tener que volver a escribirlos.
+  const [materialesExtra, setMaterialesExtra] = useState<MaterialExtraServicio[]>([])
+  const [panelExtraAbierto, setPanelExtraAbierto] = useState<string | null>(null) // tipo_servicio del panel abierto, o null
+
+  const cargarMaterialesExtra = () => { getMaterialesExtra().then(setMaterialesExtra).catch(() => {}) }
+  useEffect(() => { cargarMaterialesExtra() }, [])
+  useRealtimeSync('materiales_extra_servicio', cargarMaterialesExtra)
+
+  /** Extras guardados para un tipo de servicio, ya en formato InsumoCalculado para sumar a agregarServicio */
+  const extrasDe = (tipoServicio: string): Omit<InsumoInterno, 'id'|'linea_id'>[] =>
+    materialesExtra
+      .filter(m => m.tipo_servicio === tipoServicio)
+      .map(m => ({
+        material_nombre: m.material_nombre, cantidad: m.cantidad_sugerida,
+        unidad: m.unidad, precio_unitario: m.precio_unitario, es_manual: false,
+      }))
 
   useEffect(() => {
     getCatalogo().then(data => {
@@ -152,6 +163,20 @@ const CrearCotizacionTab: React.FC = () => {
     setInsumos(p => p.filter(i => i.id !== id))
   }
 
+  /** Guarda un material manual como extra recurrente: la próxima vez que se
+   *  agregue ese tipo de servicio, este material se incluirá automáticamente. */
+  const guardarComoRecurrente = async (ins: InsumoAgrupado, tipoServicio: MaterialExtraServicio['tipo_servicio']) => {
+    if (!ins.material_nombre.trim()) { addToast('Escribe un nombre antes de guardarlo como recurrente','error'); return }
+    try {
+      await createMaterialExtra({
+        tipo_servicio: tipoServicio, material_nombre: ins.material_nombre,
+        unidad: ins.unidad, precio_unitario: ins.precio_unitario, cantidad_sugerida: ins.cantidad,
+      })
+      addToast(`"${ins.material_nombre}" se incluirá automáticamente en ${tipoServicio} de ahora en adelante`,'success')
+      setPanelExtraAbierto(null)
+    } catch { addToast('Error guardando como recurrente','error') }
+  }
+
   // Actualizar precio en todos los internos con mismo nombre
   const actualizarPrecio = (nombreMaterial: string, nuevoPrecio: number) => {
     setInsumos(p => p.map(i => i.material_nombre === nombreMaterial ? { ...i, precio_unitario: nuevoPrecio } : i))
@@ -172,30 +197,6 @@ const CrearCotizacionTab: React.FC = () => {
     setInsumos(p => [...p, ...nuevosInsumos.map((ins, i) => ({ ...ins, id:`${id}_${i}`, linea_id:id }))])
   }
 
-  // ── Acabados opcionales (lijado, pintura) ──────────────────────
-  // Se suman como insumos sueltos (linea_id:'acabados'), no como una
-  // línea de servicio nueva: el área ya fue cobrada en Pared/Techo,
-  // aquí solo se agrega el costo de material del acabado elegido.
-  const aplicarAcabados = () => {
-    if (!ultimaArea) { addToast('Primero calcula una Pared o Techo','error'); return }
-    if (!fAcabados.lijado && !fAcabados.pintura) { addToast('Selecciona al menos un acabado','error'); return }
-
-    // Si ya había acabados aplicados, los reemplaza (evita duplicar si el usuario ajusta y vuelve a aplicar)
-    setInsumos(p => p.filter(i => i.linea_id !== 'acabados'))
-
-    const nuevos: Omit<InsumoInterno, 'id'|'linea_id'>[] = []
-    if (fAcabados.lijado) nuevos.push(armarInsumoLijado(ultimaArea.area, fAcabados.grano))
-    if (fAcabados.pintura) nuevos.push(armarInsumoPintura(ultimaArea.area, fAcabados.manos, fAcabados.tipoPintura))
-
-    setInsumos(p => [...p, ...nuevos.map((ins, i) => ({ ...ins, id:`acabados_${Date.now()}_${i}`, linea_id:'acabados' }))])
-    addToast(`Acabados agregados para ${ultimaArea.area} m2 (${ultimaArea.origen})`,'success')
-  }
-
-  const quitarAcabados = () => {
-    setInsumos(p => p.filter(i => i.linea_id !== 'acabados'))
-    setFAcabados({ lijado:false, grano:'Variado', pintura:false, manos:2, tipoPintura:'Latex' })
-  }
-
   // ── Calculadoras ─────────────────────────────────────────────
   const calcParedes = () => {
     if (!fPared.largo || !fPared.alto) { addToast('Ingresa largo y alto','error'); return }
@@ -205,10 +206,9 @@ const CrearCotizacionTab: React.FC = () => {
       agregarServicio(
         `Tabiqueria Drywall ${fPared.medida} — ${fPared.largo}m x ${fPared.alto}m x ${fPared.caras} cara(s)`,
         area, 'm2', fPared.precio,
-        armarInsumosPared(r),
+        [...armarInsumosPared(r), ...extrasDe('Pared')],
       )
       addToast(`Area: ${area} m2 → ${r.placas} planchas, ${r.parantes} parantes, ${r.rieles} rieles`,'success')
-      setUltimaArea({ area, origen: 'Pared' })
       setFPared(f => ({ ...f, largo:'', alto:'', caras:1, esquineros:0 }))
     } catch (err: any) { addToast(err.message,'error') }
   }
@@ -221,10 +221,9 @@ const CrearCotizacionTab: React.FC = () => {
       agregarServicio(
         `Techo ${fTecho.cobertura} — ${fTecho.ancho}m x ${fTecho.largo}m (${fTecho.caida}% pendiente)`,
         area, 'm2', fTecho.precio,
-        armarInsumosTecho(r, fTecho.cobertura, fTecho.canaletas),
+        [...armarInsumosTecho(r, fTecho.cobertura, fTecho.canaletas), ...extrasDe('Techo')],
       )
       addToast(`Area: ${area} m2 → ${r.calaminas} calaminas, ${r.perfilesOmega} omegas`,'success')
-      setUltimaArea({ area, origen: 'Techo' })
       setFTecho(f => ({ ...f, ancho:'', largo:'', caida:15, canaletas:0 }))
     } catch (err: any) { addToast(err.message,'error') }
   }
@@ -236,24 +235,26 @@ const CrearCotizacionTab: React.FC = () => {
     agregarServicio(
       `Melamina ${fMel.grosor} ${acabado} — ${pl.toFixed(2)} plancha(s)`,
       pl, 'Plancha', fMel.precio,
-      armarInsumosMelamina({
-        grosor: fMel.grosor, acabado, planchas: pl, precioPlancha: fMel.precio,
-        cantosD: parseFloat(fMel.cantosD||'0'), cantosG: parseFloat(fMel.cantosG||'0'),
-        correderas: fMel.correderas, bisagras: fMel.bisagras, jaladores: fMel.jaladores,
-      }),
+      [
+        ...armarInsumosMelamina({
+          grosor: fMel.grosor, acabado, planchas: pl, precioPlancha: fMel.precio,
+          cantosD: parseFloat(fMel.cantosD||'0'), cantosG: parseFloat(fMel.cantosG||'0'),
+          correderas: fMel.correderas, bisagras: fMel.bisagras, jaladores: fMel.jaladores,
+        }),
+        ...extrasDe('Melamina'),
+      ],
     )
     addToast(`Melamina: ${pl.toFixed(2)} planchas agregadas`,'success')
     setFMel(f => ({ ...f, planchas:'', cantosD:'', cantosG:'', correderas:0, bisagras:0, jaladores:0 }))
   }
 
   const calcEsp = () => {
-    const p = catalogo.find(c => c.categoria === fEsp.tipo)?.precio_base ?? fEsp.precio
     const esConteo = fEsp.tipo==='Electricidad'||fEsp.tipo==='Gasfiteria'
     if (esConteo && !fEsp.puntos) { addToast('Ingresa puntos','error'); return }
     if (!esConteo && !fEsp.m2)    { addToast('Ingresa m2','error'); return }
     const cant = esConteo ? parseInt(fEsp.puntos) : parseFloat(fEsp.m2)
     const unid = esConteo ? 'Punto' : 'm2'
-    agregarServicio(`${fEsp.tipo} — ${cant} ${unid}`, cant, unid, p, [])
+    agregarServicio(`${fEsp.tipo} — ${cant} ${unid}`, cant, unid, fEsp.precio, extrasDe(fEsp.tipo))
     addToast('Especialidad agregada','success')
     setFEsp(f => ({ ...f, m2:'', puntos:'' }))
   }
@@ -341,7 +342,6 @@ const CrearCotizacionTab: React.FC = () => {
       addToast(`Cotizacion ${correlativo} guardada en Historial`,'success')
       // Reset
       setLineas([]); setInsumos([]); setPreciosEdit(false)
-      setUltimaArea(null); setFAcabados({ lijado:false, grano:'Variado', pintura:false, manos:2, tipoPintura:'Latex' })
       setCliente({ nombre:'',telefono:'',empresa:'',proyecto:'',direccion:'',distrito:'',desgaste:0,incluye_materiales:true })
       setCondiciones(CONDICIONES_DEFAULT); setTiempoEstimado('')
       setMParedes(false); setMTechos(false); setMMelamina(false); setMEsp(false)
@@ -416,7 +416,7 @@ const CrearCotizacionTab: React.FC = () => {
               <div><label className="block text-[11px] font-medium mb-1">Alto (m)</label><input type="number" step="0.01" min="0.1" max="50" className={inp} value={fPared.alto} onChange={e=>setFPared({...fPared,alto:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Medida</label><select className={inp} value={fPared.medida} onChange={e=>setFPared({...fPared,medida:e.target.value as MedidaParante})}><option value="38mm">38mm</option><option value="64mm">64mm</option><option value="89mm">89mm</option></select></div>
               <div><label className="block text-[11px] font-medium mb-1">Caras</label><select className={inp} value={fPared.caras} onChange={e=>setFPared({...fPared,caras:parseInt(e.target.value)})}><option value={1}>1 cara</option><option value={2}>2 caras</option></select></div>
-              <div><label className="block text-[11px] font-medium mb-1">Esquineros</label><input type="number" min="0" className={inp} value={fPared.esquineros} onChange={e=>setFPared({...fPared,esquineros:parseInt(e.target.value)||0})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Esquineros</label><input type="number" min="0" className={inp} value={fPared.esquineros||''} placeholder="0" onChange={e=>setFPared({...fPared,esquineros:parseInt(e.target.value)||0})}/></div>
               <div><label className="block text-[11px] font-medium mb-1 text-indigo-600">Precio m2</label><input type="number" step="0.01" className={inp} value={fPared.precio} onChange={e=>setFPared({...fPared,precio:parseFloat(e.target.value)||0})}/></div>
             </div>
             {fPared.largo&&fPared.alto&&(()=>{try{const r=calcularPared(parseFloat(fPared.largo),parseFloat(fPared.alto),fPared.caras,fPared.esquineros,fPared.medida);return(<p className="text-xs text-indigo-700 bg-indigo-100 rounded px-3 py-1.5 mb-3">Area: <strong>{r.area.toFixed(2)} m2</strong> → {r.placas} planchas · {r.parantes} parantes · {r.rieles} rieles</p>)}catch{return null}})()}
@@ -432,63 +432,10 @@ const CrearCotizacionTab: React.FC = () => {
               <div><label className="block text-[11px] font-medium mb-1">Largo (m)</label><input type="number" step="0.01" min="0.1" max="50" className={inp} value={fTecho.largo} onChange={e=>setFTecho({...fTecho,largo:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Cobertura</label><select className={inp} value={fTecho.cobertura} onChange={e=>setFTecho({...fTecho,cobertura:e.target.value})}><option>Calamina</option><option>Eternit</option><option>Polipropileno</option></select></div>
               <div><label className="block text-[11px] font-medium mb-1">Pendiente %</label><input type="number" min="0" max="100" className={inp} value={fTecho.caida} onChange={e=>setFTecho({...fTecho,caida:parseInt(e.target.value)||0})}/></div>
-              <div><label className="block text-[11px] font-medium mb-1">Canaletas ml</label><input type="number" min="0" className={inp} value={fTecho.canaletas} onChange={e=>setFTecho({...fTecho,canaletas:parseInt(e.target.value)||0})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Canaletas ml</label><input type="number" min="0" className={inp} value={fTecho.canaletas||''} placeholder="0" onChange={e=>setFTecho({...fTecho,canaletas:parseInt(e.target.value)||0})}/></div>
               <div><label className="block text-[11px] font-medium mb-1 text-sky-600">Precio m2</label><input type="number" step="0.01" className={inp} value={fTecho.precio} onChange={e=>setFTecho({...fTecho,precio:parseFloat(e.target.value)||0})}/></div>
             </div>
             <button onClick={calcTechos} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><Calculator className="w-4 h-4"/>Agregar Servicio</button>
-          </div>
-        )}
-
-        {ultimaArea && (
-          <div className="bg-teal-50 rounded-xl p-4 mb-3 border border-teal-100">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-teal-800 flex items-center gap-1.5"><Sparkles className="w-4 h-4"/>Acabados Adicionales</span>
-              <span className="text-xs text-teal-600 bg-teal-100 px-2 py-0.5 rounded">Usa el área de {ultimaArea.origen}: {ultimaArea.area} m2</span>
-            </div>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 accent-teal-600" checked={fAcabados.lijado}
-                  onChange={e=>setFAcabados({...fAcabados, lijado:e.target.checked})}/>
-                <span className="text-sm font-medium text-teal-900">Lijado</span>
-              </label>
-              {fAcabados.lijado && (
-                <div className="ml-6 flex items-center gap-2">
-                  <label className="text-xs text-gray-600">Grano:</label>
-                  <select className={`${inp} w-32`} value={fAcabados.grano} onChange={e=>setFAcabados({...fAcabados,grano:e.target.value as GranoLija})}>
-                    {GRANOS_LIJA.map(g=><option key={g} value={g}>{g}</option>)}
-                  </select>
-                  <span className="text-xs text-gray-500">{Math.max(1,Math.ceil(ultimaArea.area/5))} pliego(s) sugeridos</span>
-                </div>
-              )}
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 accent-teal-600" checked={fAcabados.pintura}
-                  onChange={e=>setFAcabados({...fAcabados, pintura:e.target.checked})}/>
-                <span className="text-sm font-medium text-teal-900 flex items-center gap-1"><Paintbrush className="w-3.5 h-3.5"/>Pintura</span>
-              </label>
-              {fAcabados.pintura && (
-                <div className="ml-6 flex items-center gap-2 flex-wrap">
-                  <label className="text-xs text-gray-600">Tipo:</label>
-                  <select className={`${inp} w-28`} value={fAcabados.tipoPintura} onChange={e=>setFAcabados({...fAcabados,tipoPintura:e.target.value})}>
-                    <option value="Latex">Latex</option><option value="Oleo">Óleo</option><option value="Anticorrosiva">Anticorrosiva</option>
-                  </select>
-                  <label className="text-xs text-gray-600">Manos:</label>
-                  <select className={`${inp} w-16`} value={fAcabados.manos} onChange={e=>setFAcabados({...fAcabados,manos:parseInt(e.target.value)})}>
-                    <option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
-                  </select>
-                  <span className="text-xs text-gray-500">{Math.max(1,Math.ceil((ultimaArea.area*fAcabados.manos)/32))} galón(es) sugeridos</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 mt-3">
-              <button onClick={aplicarAcabados} className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><Plus className="w-4 h-4"/>Agregar Acabados</button>
-              {insumos.some(i=>i.linea_id==='acabados') && (
-                <button onClick={quitarAcabados} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium">Quitar</button>
-              )}
-            </div>
-            <p className="text-[11px] text-gray-400 mt-2">Las cantidades son aproximadas según rendimiento estándar; ajústalas en la lista de materiales si lo necesitas.</p>
           </div>
         )}
 
@@ -502,9 +449,9 @@ const CrearCotizacionTab: React.FC = () => {
               {fMel.acabado==='Personalizado'&&<div><label className="block text-[11px] font-medium mb-1">Especifica</label><input type="text" className={inp} value={fMel.acabadoCustom} onChange={e=>setFMel({...fMel,acabadoCustom:e.target.value})}/></div>}
               <div><label className="block text-[11px] font-medium mb-1">Canto Delgado ml</label><input type="number" step="0.1" min="0" className={inp} value={fMel.cantosD} onChange={e=>setFMel({...fMel,cantosD:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Canto Grueso ml</label><input type="number" step="0.1" min="0" className={inp} value={fMel.cantosG} onChange={e=>setFMel({...fMel,cantosG:e.target.value})}/></div>
-              <div><label className="block text-[11px] font-medium mb-1">Correderas</label><input type="number" min="0" className={inp} value={fMel.correderas} onChange={e=>setFMel({...fMel,correderas:parseInt(e.target.value)||0})}/></div>
-              <div><label className="block text-[11px] font-medium mb-1">Bisagras</label><input type="number" min="0" className={inp} value={fMel.bisagras} onChange={e=>setFMel({...fMel,bisagras:parseInt(e.target.value)||0})}/></div>
-              <div><label className="block text-[11px] font-medium mb-1">Jaladores</label><input type="number" min="0" className={inp} value={fMel.jaladores} onChange={e=>setFMel({...fMel,jaladores:parseInt(e.target.value)||0})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Correderas</label><input type="number" min="0" className={inp} value={fMel.correderas||''} placeholder="0" onChange={e=>setFMel({...fMel,correderas:parseInt(e.target.value)||0})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Bisagras</label><input type="number" min="0" className={inp} value={fMel.bisagras||''} placeholder="0" onChange={e=>setFMel({...fMel,bisagras:parseInt(e.target.value)||0})}/></div>
+              <div><label className="block text-[11px] font-medium mb-1">Jaladores</label><input type="number" min="0" className={inp} value={fMel.jaladores||''} placeholder="0" onChange={e=>setFMel({...fMel,jaladores:parseInt(e.target.value)||0})}/></div>
               <div><label className="block text-[11px] font-medium mb-1 text-amber-600">Precio plancha</label><input type="number" step="0.01" className={inp} value={fMel.precio} onChange={e=>setFMel({...fMel,precio:parseFloat(e.target.value)||0})}/></div>
             </div>
             <button onClick={calcMelamina} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><Calculator className="w-4 h-4"/>Agregar Servicio</button>
@@ -515,7 +462,11 @@ const CrearCotizacionTab: React.FC = () => {
           <div className="bg-purple-50 rounded-xl p-4 mb-3 border border-purple-100">
             <span className="text-sm font-semibold text-purple-800 block mb-3">🔌 Especialidades</span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-              <div><label className="block text-[11px] font-medium mb-1">Tipo</label><select className={inp} value={fEsp.tipo} onChange={e=>setFEsp({...fEsp,tipo:e.target.value,m2:'',puntos:''})}><option>Pintura</option><option>Enchape</option><option>Electricidad</option><option>Gasfiteria</option></select></div>
+              <div><label className="block text-[11px] font-medium mb-1">Tipo</label><select className={inp} value={fEsp.tipo} onChange={e=>{
+                const nuevoTipo = e.target.value
+                const precioSugerido = catalogo.find(c => c.categoria === nuevoTipo)?.precio_base
+                setFEsp({...fEsp, tipo:nuevoTipo, m2:'', puntos:'', precio: precioSugerido ?? fEsp.precio})
+              }}><option>Pintura</option><option>Enchape</option><option>Electricidad</option><option>Gasfiteria</option></select></div>
               {(fEsp.tipo==='Pintura'||fEsp.tipo==='Enchape')&&<div><label className="block text-[11px] font-medium mb-1">m2</label><input type="number" step="0.01" className={inp} value={fEsp.m2} onChange={e=>setFEsp({...fEsp,m2:e.target.value})}/></div>}
               {(fEsp.tipo==='Electricidad'||fEsp.tipo==='Gasfiteria')&&<div><label className="block text-[11px] font-medium mb-1">Puntos</label><input type="number" min="1" className={inp} value={fEsp.puntos} onChange={e=>setFEsp({...fEsp,puntos:e.target.value})}/></div>}
               <div><label className="block text-[11px] font-medium mb-1 text-purple-600">Precio unit.</label><input type="number" step="0.01" className={inp} value={fEsp.precio} onChange={e=>setFEsp({...fEsp,precio:parseFloat(e.target.value)||0})}/></div>
@@ -546,6 +497,28 @@ const CrearCotizacionTab: React.FC = () => {
           </div>
         )}
       </section>
+
+      {/* PANEL: Materiales recurrentes guardados */}
+      {materialesExtra.length > 0 && (
+        <section className="bg-white p-4 rounded-xl border border-amber-200 shadow-sm mb-1">
+          <button onClick={() => setPanelExtraAbierto(panelExtraAbierto === 'gestion' ? null : 'gestion')}
+            className="w-full flex items-center justify-between text-sm font-medium text-amber-700">
+            <span className="flex items-center gap-2"><Star className="w-4 h-4"/>Materiales recurrentes ({materialesExtra.length})</span>
+            <span className="text-xs text-gray-400">{panelExtraAbierto === 'gestion' ? 'Ocultar' : 'Ver / quitar'}</span>
+          </button>
+          {panelExtraAbierto === 'gestion' && (
+            <div className="mt-3 space-y-1.5">
+              {materialesExtra.map(m => (
+                <div key={m.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="text-gray-700"><strong className="text-amber-700">{m.tipo_servicio}</strong> — {m.material_nombre} ({m.cantidad_sugerida} {m.unidad} · S/{m.precio_unitario})</span>
+                  <button onClick={async () => { try { await deleteMaterialExtra(m.id); addToast('Quitado de recurrentes','success') } catch { addToast('Error al quitar','error') } }}
+                    className="p-1 text-red-400 hover:bg-red-50 rounded flex-shrink-0"><Trash2 className="w-3.5 h-3.5"/></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* 3. LISTA DE PRECIOS E INSUMOS */}
       <section className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
@@ -590,8 +563,24 @@ const CrearCotizacionTab: React.FC = () => {
                       ) : (
                         <p className="font-medium text-sm text-gray-800 truncate">{ins.material_nombre || <span className="text-gray-400 italic">Sin nombre</span>}</p>
                       )}
-                      <button onClick={() => ins.es_manual && ins.id ? eliminarInsumoManual(ins.id) : eliminarMaterial(ins.material_nombre)}
-                        className="p-1 text-red-400 hover:bg-red-50 rounded flex-shrink-0"><Trash2 className="w-3.5 h-3.5"/></button>
+                      <div className="flex items-center gap-1 flex-shrink-0 relative">
+                        {ins.es_manual && ins.material_nombre.trim() && (
+                          <button onClick={() => setPanelExtraAbierto(panelExtraAbierto === ins.id ? null : (ins.id || null))}
+                            title="Guardar como material recurrente" className="p-1 text-amber-400 hover:bg-amber-50 rounded"><Star className="w-3.5 h-3.5"/></button>
+                        )}
+                        <button onClick={() => ins.es_manual && ins.id ? eliminarInsumoManual(ins.id) : eliminarMaterial(ins.material_nombre)}
+                          className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5"/></button>
+                        {panelExtraAbierto === ins.id && (
+                          <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-44">
+                            <p className="text-[11px] text-gray-500 mb-1.5 px-1">Auto-incluir en futuras:</p>
+                            {(['Pared','Techo','Melamina','Pintura','Enchape','Electricidad','Gasfiteria'] as const).map(tipo => (
+                              <button key={tipo} onClick={() => guardarComoRecurrente(ins, tipo)}
+                                className="block w-full text-left text-xs px-2 py-1.5 hover:bg-amber-50 rounded">{tipo}</button>
+                            ))}
+                            <button onClick={() => setPanelExtraAbierto(null)} className="flex items-center gap-1 text-[11px] text-gray-400 px-2 py-1 mt-1 hover:text-gray-600"><X className="w-3 h-3"/>Cancelar</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {editable ? (
                       <div className="flex items-center gap-2">
@@ -667,10 +656,24 @@ const CrearCotizacionTab: React.FC = () => {
                         S/ {(ins.cantidad * ins.precio_unitario).toFixed(2)}
                       </td>
                       <td className="py-2.5 px-2">
-                        <button onClick={() => ins.es_manual && ins.id ? eliminarInsumoManual(ins.id) : eliminarMaterial(ins.material_nombre)}
-                          className="p-1 text-red-400 hover:bg-red-50 rounded opacity-60 hover:opacity-100">
-                          <Trash2 className="w-3.5 h-3.5"/>
-                        </button>
+                        <div className="flex items-center gap-1 relative">
+                          {ins.es_manual && ins.material_nombre.trim() && (
+                            <button onClick={() => setPanelExtraAbierto(panelExtraAbierto === ins.id ? null : (ins.id || null))}
+                              title="Guardar como material recurrente" className="p-1 text-amber-400 hover:bg-amber-50 rounded"><Star className="w-3.5 h-3.5"/></button>
+                          )}
+                          <button onClick={() => ins.es_manual && ins.id ? eliminarInsumoManual(ins.id) : eliminarMaterial(ins.material_nombre)}
+                            className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 className="w-3.5 h-3.5"/></button>
+                          {panelExtraAbierto === ins.id && (
+                            <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-48">
+                              <p className="text-[11px] text-gray-500 mb-1.5 px-1">Auto-incluir en futuras:</p>
+                              {(['Pared','Techo','Melamina','Pintura','Enchape','Electricidad','Gasfiteria'] as const).map(tipo => (
+                                <button key={tipo} onClick={() => guardarComoRecurrente(ins, tipo)}
+                                  className="block w-full text-left text-xs px-2 py-1.5 hover:bg-amber-50 rounded">{tipo}</button>
+                              ))}
+                              <button onClick={() => setPanelExtraAbierto(null)} className="flex items-center gap-1 text-[11px] text-gray-400 px-2 py-1 mt-1 hover:text-gray-600"><X className="w-3 h-3"/>Cancelar</button>
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

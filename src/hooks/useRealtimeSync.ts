@@ -9,6 +9,7 @@ type TablaDB =
   | 'gastos_personales'
   | 'control_venta_casa'
   | 'configuracion_app'
+  | 'materiales_extra_servicio'
 
 /**
  * Suscribe un componente a cambios en tiempo real de una o más tablas.

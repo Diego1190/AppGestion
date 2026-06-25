@@ -89,6 +89,18 @@ export interface CotizacionInsumo {
   comprado: boolean
 }
 
+/** Material extra que el usuario agregó manualmente a un tipo de servicio,
+ *  y que se vuelve a incluir automáticamente cada vez que se cotiza ese
+ *  mismo servicio (sin tener que volver a escribirlo). */
+export interface MaterialExtraServicio {
+  id: string
+  tipo_servicio: 'Pared' | 'Techo' | 'Melamina' | 'Pintura' | 'Enchape' | 'Electricidad' | 'Gasfiteria'
+  material_nombre: string
+  unidad: string
+  precio_unitario: number
+  cantidad_sugerida: number
+}
+
 // MÓDULO 3: FINANZAS
 export interface GastoPersonal {
   id: string
