@@ -116,7 +116,7 @@ export interface ControlVentaCasa {
   mes: number
   anio: number
   monto_pagado: number
-  entregado_a: 'Gabriel' | 'Fernando' | 'tu'
+  entregado_a: 'Gabriel' | 'Fernando' | 'Tú'
 }
 
 export interface HistorialConsumo {
