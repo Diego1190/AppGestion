@@ -3,7 +3,7 @@ import { Plus, Trash2, ToggleLeft, ToggleRight, Calculator, Package, Lock, Star,
 import { getCatalogo, createCotizacion, createDetalles, createInsumos } from '@/lib/cotizaciones'
 import { getMaterialesExtra, createMaterialExtra, deleteMaterialExtra } from '@/lib/materialesExtra'
 import {
-  generarCorrelativo, calcularPared, calcularTecho, validarTelefono, MedidaParante,
+  generarCorrelativo, calcularPared, calcularTecho, validarTelefono, MedidaParante, TipoPlaca, Vano,
   armarInsumosPared, armarInsumosTecho, armarInsumosMelamina,
 } from '@/lib/calculations'
 import { CatalogoServicio, MaterialExtraServicio } from '@/types/index'
@@ -80,7 +80,10 @@ const CrearCotizacionTab: React.FC = () => {
     incluye_materiales: true,
   })
 
-  const [fPared, setFPared] = useState({ largo:'', alto:'', caras:1, esquineros:0, medida:'64mm' as MedidaParante, precio:45 })
+  const [fPared, setFPared] = useState({
+    largo:'', alto:'', caras:1, esquineros:0, medida:'64mm' as MedidaParante, tipoPlaca:'ST' as TipoPlaca, precio:45,
+    puertas: [] as Vano[], ventanas: [] as Vano[],
+  })
   const [fTecho, setFTecho] = useState({ ancho:'', largo:'', cobertura:'Calamina', caida:15, canaletas:0, precio:55 })
   const [fMel,   setFMel]   = useState({ planchas:'', grosor:'18mm', acabado:'Blanco', acabadoCustom:'', cantosD:'', cantosG:'', correderas:0, bisagras:0, jaladores:0, precio:85 })
   const [fEsp,   setFEsp]   = useState({ tipo:'Pintura', m2:'', puntos:'', precio:15 })
@@ -201,15 +204,17 @@ const CrearCotizacionTab: React.FC = () => {
   const calcParedes = () => {
     if (!fPared.largo || !fPared.alto) { addToast('Ingresa largo y alto','error'); return }
     try {
-      const r = calcularPared(parseFloat(fPared.largo), parseFloat(fPared.alto), fPared.caras, fPared.esquineros, fPared.medida)
+      const vanos = [...fPared.puertas, ...fPared.ventanas]
+      const r = calcularPared(parseFloat(fPared.largo), parseFloat(fPared.alto), fPared.caras, fPared.esquineros, fPared.medida, undefined, fPared.tipoPlaca, vanos)
       const area = parseFloat(r.area.toFixed(2))
+      const vanosTxt = vanos.length > 0 ? ` − ${vanos.length} vano(s)` : ''
       agregarServicio(
-        `Tabiqueria Drywall ${fPared.medida} — ${fPared.largo}m x ${fPared.alto}m x ${fPared.caras} cara(s)`,
+        `Tabiqueria Drywall ${fPared.tipoPlaca} ${fPared.medida} — ${fPared.largo}m x ${fPared.alto}m x ${fPared.caras} cara(s)${vanosTxt}`,
         area, 'm2', fPared.precio,
         [...armarInsumosPared(r), ...extrasDe('Pared')],
       )
-      addToast(`Area: ${area} m2 → ${r.placas} planchas, ${r.parantes} parantes, ${r.rieles} rieles`,'success')
-      setFPared(f => ({ ...f, largo:'', alto:'', caras:1, esquineros:0 }))
+      addToast(`Area neta: ${area} m2 → ${r.placas} planchas, ${r.parantes} parantes, ${r.rieles} rieles`,'success')
+      setFPared(f => ({ ...f, largo:'', alto:'', caras:1, esquineros:0, puertas:[], ventanas:[] }))
     } catch (err: any) { addToast(err.message,'error') }
   }
 
@@ -411,15 +416,43 @@ const CrearCotizacionTab: React.FC = () => {
               <span className="text-sm font-semibold text-indigo-800">🧱 Paredes Drywall</span>
               <span className="text-xs text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded">2 caras = doble placa, misma estructura</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2 mb-3">
               <div><label className="block text-[11px] font-medium mb-1">Largo (m)</label><input type="number" step="0.01" min="0.1" max="50" className={inp} value={fPared.largo} onChange={e=>setFPared({...fPared,largo:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Alto (m)</label><input type="number" step="0.01" min="0.1" max="50" className={inp} value={fPared.alto} onChange={e=>setFPared({...fPared,alto:e.target.value})}/></div>
               <div><label className="block text-[11px] font-medium mb-1">Medida</label><select className={inp} value={fPared.medida} onChange={e=>setFPared({...fPared,medida:e.target.value as MedidaParante})}><option value="38mm">38mm</option><option value="64mm">64mm</option><option value="89mm">89mm</option></select></div>
+              <div><label className="block text-[11px] font-medium mb-1">Tipo Placa</label><select className={inp} value={fPared.tipoPlaca} onChange={e=>setFPared({...fPared,tipoPlaca:e.target.value as TipoPlaca})}><option value="ST">ST (Standard)</option><option value="RH">RH (Resist. Humedad)</option></select></div>
               <div><label className="block text-[11px] font-medium mb-1">Caras</label><select className={inp} value={fPared.caras} onChange={e=>setFPared({...fPared,caras:parseInt(e.target.value)})}><option value={1}>1 cara</option><option value={2}>2 caras</option></select></div>
               <div><label className="block text-[11px] font-medium mb-1">Esquineros</label><input type="number" min="0" className={inp} value={fPared.esquineros||''} placeholder="0" onChange={e=>setFPared({...fPared,esquineros:parseInt(e.target.value)||0})}/></div>
               <div><label className="block text-[11px] font-medium mb-1 text-indigo-600">Precio m2</label><input type="number" step="0.01" className={inp} value={fPared.precio} onChange={e=>setFPared({...fPared,precio:parseFloat(e.target.value)||0})}/></div>
             </div>
-            {fPared.largo&&fPared.alto&&(()=>{try{const r=calcularPared(parseFloat(fPared.largo),parseFloat(fPared.alto),fPared.caras,fPared.esquineros,fPared.medida);return(<p className="text-xs text-indigo-700 bg-indigo-100 rounded px-3 py-1.5 mb-3">Area: <strong>{r.area.toFixed(2)} m2</strong> → {r.placas} planchas · {r.parantes} parantes · {r.rieles} rieles</p>)}catch{return null}})()}
+
+            {/* Vanos: puertas y ventanas, restan área y suman refuerzo de marco */}
+            <div className="bg-white rounded-lg border border-indigo-200 p-3 mb-3">
+              <p className="text-xs font-semibold text-indigo-700 mb-2">Vanos (puertas / ventanas) — opcional</p>
+              <div className="flex gap-2 mb-2">
+                <button onClick={()=>setFPared(f=>({...f, puertas:[...f.puertas, {tipo:'Puerta', ancho:0.9, alto:2.1, cantidad:1}]}))}
+                  className="text-xs px-2.5 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg font-medium flex items-center gap-1"><Plus className="w-3 h-3"/>Puerta</button>
+                <button onClick={()=>setFPared(f=>({...f, ventanas:[...f.ventanas, {tipo:'Ventana', ancho:1.2, alto:1.0, cantidad:1}]}))}
+                  className="text-xs px-2.5 py-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-lg font-medium flex items-center gap-1"><Plus className="w-3 h-3"/>Ventana</button>
+              </div>
+              {[...fPared.puertas.map((v,i)=>({v,i,grupo:'puertas' as const})), ...fPared.ventanas.map((v,i)=>({v,i,grupo:'ventanas' as const}))].map(({v,i,grupo}) => (
+                <div key={`${grupo}-${i}`} className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-[11px] text-gray-500 w-14">{v.tipo}</span>
+                  <input type="number" step="0.01" min="0.1" className="w-16 px-2 py-1 border border-gray-300 rounded text-xs" placeholder="Ancho" value={v.ancho}
+                    onChange={e=>setFPared(f=>({...f, [grupo]: f[grupo].map((x,xi)=>xi===i?{...x,ancho:parseFloat(e.target.value)||0}:x)}))}/>
+                  <span className="text-[10px] text-gray-400">x</span>
+                  <input type="number" step="0.01" min="0.1" className="w-16 px-2 py-1 border border-gray-300 rounded text-xs" placeholder="Alto" value={v.alto}
+                    onChange={e=>setFPared(f=>({...f, [grupo]: f[grupo].map((x,xi)=>xi===i?{...x,alto:parseFloat(e.target.value)||0}:x)}))}/>
+                  <span className="text-[10px] text-gray-400">m ×</span>
+                  <input type="number" min="1" className="w-12 px-2 py-1 border border-gray-300 rounded text-xs" value={v.cantidad}
+                    onChange={e=>setFPared(f=>({...f, [grupo]: f[grupo].map((x,xi)=>xi===i?{...x,cantidad:parseInt(e.target.value)||1}:x)}))}/>
+                  <button onClick={()=>setFPared(f=>({...f, [grupo]: f[grupo].filter((_,xi)=>xi!==i)}))} className="p-1 text-red-400 hover:bg-red-50 rounded ml-auto"><Trash2 className="w-3.5 h-3.5"/></button>
+                </div>
+              ))}
+              {fPared.puertas.length===0 && fPared.ventanas.length===0 && <p className="text-[11px] text-gray-400">Sin vanos agregados.</p>}
+            </div>
+
+            {fPared.largo&&fPared.alto&&(()=>{try{const r=calcularPared(parseFloat(fPared.largo),parseFloat(fPared.alto),fPared.caras,fPared.esquineros,fPared.medida,undefined,fPared.tipoPlaca,[...fPared.puertas,...fPared.ventanas]);return(<p className="text-xs text-indigo-700 bg-indigo-100 rounded px-3 py-1.5 mb-3">Area neta: <strong>{r.area.toFixed(2)} m2</strong>{r.areaVanos>0&&<> (−{r.areaVanos.toFixed(2)} m2 de vanos)</>} → {r.placas} planchas · {r.parantes} parantes · {r.rieles} rieles</p>)}catch{return null}})()}
             <button onClick={calcParedes} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><Calculator className="w-4 h-4"/>Agregar Servicio</button>
           </div>
         )}

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   calcularPared, calcularTecho, validarDNI, validarTelefono,
   precioRef, armarInsumosPared, armarInsumosTecho, armarInsumosMelamina,
-  generarCorrelativo, MAX_DIMENSION_M,
+  generarCorrelativo, MAX_DIMENSION_M, Vano,
   calcularPliegosLija, armarInsumoLijado, calcularGalonesPintura, armarInsumoPintura,
 } from '../calculations'
 
@@ -74,6 +74,50 @@ describe('calcularPared', () => {
 
   it('acepta exactamente el límite máximo de dimensión', () => {
     expect(() => calcularPared(MAX_DIMENSION_M, 2.5, 1)).not.toThrow()
+  })
+
+  it('sin vanos, el resultado es idéntico al comportamiento anterior (compatibilidad)', () => {
+    const r = calcularPared(3, 2.5, 1)
+    expect(r.area).toBe(7.5)
+    expect(r.areaVanos).toBe(0)
+    expect(r.parantesVanos).toBe(0)
+    expect(r.rielesVanos).toBe(0)
+    expect(r.tipoPlaca).toBe('ST') // default
+  })
+
+  it('una puerta resta su área de la pared y agrega refuerzo de 3 lados (2 parantes verticales + 1 riel superior)', () => {
+    const r = calcularPared(3, 2.5, 1, 0, '64mm', 0.15, 'ST', [
+      { tipo: 'Puerta', ancho: 0.9, alto: 2.1, cantidad: 1 },
+    ])
+    expect(r.areaVanos).toBeCloseTo(1.89)
+    expect(r.area).toBeCloseTo(5.61)
+    expect(r.parantesVanos).toBe(12) // 2 lados verticales x ceil(2.1/0.406)=6
+    expect(r.rielesVanos).toBe(3)    // 1 lado superior x ceil(0.9/0.406)=3
+  })
+
+  it('una ventana refuerza los 4 lados completos (2 parantes + 2 rieles)', () => {
+    const r = calcularPared(5, 3, 1, 0, '64mm', 0.15, 'ST', [
+      { tipo: 'Ventana', ancho: 1.2, alto: 1.0, cantidad: 1 },
+    ])
+    expect(r.parantesVanos).toBe(6) // 2 lados verticales x ceil(1.0/0.406)=3
+    expect(r.rielesVanos).toBe(6)   // 2 lados horizontales x ceil(1.2/0.406)=3
+  })
+
+  it('varios vanos se acumulan correctamente (puerta + ventana)', () => {
+    const r = calcularPared(5, 3, 1, 0, '64mm', 0.15, 'ST', [
+      { tipo: 'Puerta', ancho: 0.9, alto: 2.1, cantidad: 1 },
+      { tipo: 'Ventana', ancho: 1.2, alto: 1.0, cantidad: 1 },
+    ])
+    expect(r.areaVanos).toBeCloseTo(3.09)
+    expect(r.parantesVanos).toBe(18) // 12 (puerta) + 6 (ventana)
+    expect(r.rielesVanos).toBe(9)    // 3 (puerta) + 6 (ventana)
+  })
+
+  it('el tipo de placa por defecto es ST, y se puede elegir RH', () => {
+    const st = calcularPared(3, 2.5, 1, 0, '64mm', 0.15, 'ST')
+    const rh = calcularPared(3, 2.5, 1, 0, '64mm', 0.15, 'RH')
+    expect(st.tipoPlaca).toBe('ST')
+    expect(rh.tipoPlaca).toBe('RH')
   })
 })
 
@@ -155,7 +199,7 @@ describe('validarTelefono', () => {
 // ============================================================
 describe('precioRef', () => {
   it('devuelve el precio conocido de un material del catálogo', () => {
-    expect(precioRef('Plancha Drywall 1/2"')).toBe(28.5)
+    expect(precioRef('Plancha Drywall ST 1/2"')).toBe(28.5)
   })
   it('devuelve 10 (precio por defecto) para un material que no está en el catálogo', () => {
     expect(precioRef('Material que no existe')).toBe(10)
@@ -173,6 +217,13 @@ describe('armarInsumosPared', () => {
     expect(nombres).not.toContain('Esquinero Metalico 2.44m')
     expect(nombres).toContain('Parante 64mm (3m)')
     expect(nombres).toContain('Riel 65mm (3m)')
+  })
+
+  it('usa el nombre de plancha según el tipo de placa elegido (ST o RH)', () => {
+    const st = armarInsumosPared(calcularPared(3, 2.5, 1, 0, '64mm', 0.15, 'ST'))
+    const rh = armarInsumosPared(calcularPared(3, 2.5, 1, 0, '64mm', 0.15, 'RH'))
+    expect(st.some(i => i.material_nombre === 'Plancha Drywall ST 1/2"')).toBe(true)
+    expect(rh.some(i => i.material_nombre === 'Plancha Drywall RH 1/2"')).toBe(true)
   })
 
   it('incluye esquineros solo cuando esquinerosExpuestos > 0', () => {

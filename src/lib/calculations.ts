@@ -20,6 +20,16 @@ const M2_POR_PLIEGO_LIJA      = 5      // 1 pliego de lija cubre ~5 m2
 const M2_POR_GALON_PINTURA    = 32     // promedio 30-35 m2 por mano, latex estandar
 
 export type MedidaParante = '38mm' | '64mm' | '89mm'
+export type TipoPlaca = 'ST' | 'RH'
+
+/** Un vano (puerta o ventana) que se resta del área de pared y necesita
+ *  refuerzo de marco en sus lados. */
+export interface Vano {
+  tipo: 'Puerta' | 'Ventana'
+  ancho: number  // metros
+  alto: number   // metros
+  cantidad: number
+}
 
 /** Límite superior razonable para una sola dimensión (largo/alto/ancho) en metros.
  *  No es una limitación física real, es una red de seguridad contra errores de
@@ -35,29 +45,50 @@ const RIEL_COMPAT: Record<MedidaParante, string> = {
 // PARED DRYWALL
 // ============================================================
 export interface CalculoPared {
-  area: number; placas: number; parantes: number; rieles: number
+  area: number; areaVanos: number; placas: number; parantes: number; rieles: number
   esquineros: number; cinta: number; masilla: number
   tornillosPuntaFina: number   // millares
   tornillosPuntaBroca: number  // unidades
   anclajes: number             // fulminante+clavo riel a losa
-  medida: MedidaParante; rielMedida: string
+  medida: MedidaParante; rielMedida: string; tipoPlaca: TipoPlaca
+  /** Parantes y rieles adicionales para forrar el marco de los vanos (ya incluidos en parantes/rieles totales) */
+  parantesVanos: number; rielesVanos: number
+}
+
+/** Refuerzo de marco para un solo vano: parante en los lados verticales,
+ *  riel en los lados horizontales (mismo criterio que el resto de la pared).
+ *  Puerta: 2 verticales + 1 superior (no se forra el piso).
+ *  Ventana: 4 lados completos. */
+const calcularRefuerzoVano = (v: Vano): { parante: number; riel: number } => {
+  const parantePorUnidad = 2 * Math.ceil(v.alto / SEPARACION_PARANTE_M)
+  const rielesHorizontales = v.tipo === 'Ventana' ? 2 : 1
+  const rielPorUnidad = rielesHorizontales * Math.ceil(v.ancho / SEPARACION_PARANTE_M)
+  return { parante: parantePorUnidad * v.cantidad, riel: rielPorUnidad * v.cantidad }
 }
 
 export const calcularPared = (
   largo: number, alto: number, caras: number,
   esquinerosExpuestos = 0, medida: MedidaParante = '64mm',
   desperdicio = DESPERDICIO_PLANCHAS,
+  tipoPlaca: TipoPlaca = 'ST',
+  vanos: Vano[] = [],
 ): CalculoPared => {
   if (largo <= 0 || alto <= 0 || caras < 1)
     throw new Error('Dimensiones invalidas')
   if (largo > MAX_DIMENSION_M || alto > MAX_DIMENSION_M)
     throw new Error(`Dimension fuera de rango (maximo ${MAX_DIMENSION_M}m). Verifica que no sea un error de tecleo.`)
 
-  const area          = largo * alto * caras
+  const areaVanos     = vanos.reduce((s, v) => s + v.ancho * v.alto * v.cantidad, 0)
+  const areaBruta     = largo * alto * caras
+  const area          = Math.max(0, areaBruta - areaVanos)
   const placas        = Math.ceil((area / PLANCHA_AREA_M2) * (1 + desperdicio))
   const posParantes   = Math.floor(largo / SEPARACION_PARANTE_M) + 1
-  const parantes      = posParantes * (alto > ALTURA_MAX_PARANTE_M ? 2 : 1)
-  const rieles        = Math.ceil((largo * 2) / LARGO_PIEZA_M)
+  const refuerzoVanos = vanos.reduce((acc, v) => {
+    const r = calcularRefuerzoVano(v)
+    return { parante: acc.parante + r.parante, riel: acc.riel + r.riel }
+  }, { parante: 0, riel: 0 })
+  const parantes      = posParantes * (alto > ALTURA_MAX_PARANTE_M ? 2 : 1) + refuerzoVanos.parante
+  const rieles        = Math.ceil((largo * 2) / LARGO_PIEZA_M) + refuerzoVanos.riel
   const esquineros    = Math.ceil(alto / ALTURA_MAX_PARANTE_M) * esquinerosExpuestos
   const cinta         = Math.max(1, Math.ceil(((posParantes - 1) * alto * caras * 1.1) / METROS_CINTA_ROLLO))
   const masilla       = Math.max(1, Math.ceil(area / M2_POR_BALDE_MASILLA))
@@ -65,9 +96,10 @@ export const calcularPared = (
   const tornillosPuntaBroca  = posParantes * 4
   const anclajes      = Math.ceil((largo * 2) / ESPACIADO_ANCLAJE_M)
 
-  return { area, placas, parantes, rieles, esquineros, cinta, masilla,
+  return { area, areaVanos, placas, parantes, rieles, esquineros, cinta, masilla,
     tornillosPuntaFina, tornillosPuntaBroca, anclajes,
-    medida, rielMedida: RIEL_COMPAT[medida] }
+    medida, rielMedida: RIEL_COMPAT[medida], tipoPlaca,
+    parantesVanos: refuerzoVanos.parante, rielesVanos: refuerzoVanos.riel }
 }
 
 // ============================================================
@@ -215,7 +247,7 @@ export interface InsumoCalculado {
 
 // Precios referenciales de materiales (fuente única de verdad de precios sugeridos)
 export const PRECIOS_REF: Record<string, number> = {
-  'Plancha Drywall 1/2"':28.5, 'Parante 64mm (3m)':6, 'Riel 65mm (3m)':5.5,
+  'Plancha Drywall ST 1/2"':28.5, 'Plancha Drywall RH 1/2"':38.5, 'Parante 64mm (3m)':6, 'Riel 65mm (3m)':5.5,
   'Parante 38mm (3m)':5, 'Riel 39mm (3m)':4.5, 'Parante 89mm (3m)':8, 'Riel 90mm (3m)':7.5,
   'Esquinero Metalico 2.44m':3.5, 'Cinta de Papel 75m':8, 'Masilla Drywall 5kg':18,
   'Tornillos Punta Fina 1"':12, 'Tornillos Punta Broca 1/2"':0.05,
@@ -235,7 +267,7 @@ export const precioRef = (nombre: string): number => PRECIOS_REF[nombre] ?? 10
 
 /** Insumos para una pared de drywall, a partir del resultado de calcularPared() */
 export const armarInsumosPared = (r: CalculoPared): InsumoCalculado[] => [
-  { material_nombre:`Plancha Drywall 1/2"`, cantidad:r.placas, unidad:'Unid', precio_unitario:precioRef('Plancha Drywall 1/2"'), es_manual:false },
+  { material_nombre:`Plancha Drywall ${r.tipoPlaca} 1/2"`, cantidad:r.placas, unidad:'Unid', precio_unitario:precioRef(`Plancha Drywall ${r.tipoPlaca} 1/2"`), es_manual:false },
   { material_nombre:`Parante ${r.medida} (3m)`, cantidad:r.parantes, unidad:'Unid', precio_unitario:precioRef(`Parante ${r.medida} (3m)`), es_manual:false },
   { material_nombre:`Riel ${r.rielMedida} (3m)`, cantidad:r.rieles, unidad:'Unid', precio_unitario:precioRef(`Riel ${r.rielMedida} (3m)`), es_manual:false },
   ...(r.esquineros>0?[{ material_nombre:'Esquinero Metalico 2.44m', cantidad:r.esquineros, unidad:'Unid', precio_unitario:precioRef('Esquinero Metalico 2.44m'), es_manual:false as const }]:[]),
