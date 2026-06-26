@@ -166,8 +166,8 @@ describe('calcularTecho', () => {
     const r = calcularTecho(4, 6, 'Calamina', 15, 0, true)
     expect(r.incluyeCieloRaso).toBe(true)
     expect(r.planchasCieloRaso).toBe(10) // ceil((24/2.977)*1.15)
-    expect(r.parantesCieloRaso).toBe(10) // floor(4/0.406)+1
-    expect(r.rielesCieloRaso).toBe(7)    // ceil(perimetro/3) = ceil(20/3)
+    expect(r.parantesCieloRaso).toBe(15) // ceil(largo/0.40) = ceil(6/0.40)
+    expect(r.rielesCieloRaso).toBe(4)    // 2 extremos x ceil(ancho/3) = 2*ceil(4/3)
     expect(r.masillaCieloRaso).toBe(3)   // ceil(24/10)
   })
 
@@ -178,6 +178,12 @@ describe('calcularTecho', () => {
     expect(r.rielesCieloRaso).toBeGreaterThan(0)
     expect(r.parantesT).toBeGreaterThan(0)
     expect(r.parantesCieloRaso).toBeGreaterThan(0)
+  })
+
+  it('caso de obra real: techo de 3m (ancho) x 5m (largo) da 13 parantes (verificado en boceto físico)', () => {
+    const r = calcularTecho(3, 5, 'Calamina', 15, 0, true)
+    expect(r.parantesCieloRaso).toBe(13) // ceil(5/0.40) = ceil(12.5) = 13
+    expect(r.rielesCieloRaso).toBe(2)    // 2 extremos x ceil(3/3) = 2*1
   })
 
   it.each([

@@ -117,7 +117,7 @@ export interface CalculoTecho {
   incluyeCieloRaso: boolean
   planchasCieloRaso: number       // plancha drywall 3/8", misma medida 1.22x2.44
   parantesCieloRaso: number       // separacion 0.406m, igual que pared
-  rielesCieloRaso: number         // perimetral, adicional al riel de la cobertura
+  rielesCieloRaso: number         // 2 extremos del largo, en piezas de 3m según el ancho
   cintaCieloRaso: number
   masillaCieloRaso: number
   tornillosPuntaFinaCieloRaso: number   // millares, fija la plancha
@@ -125,6 +125,7 @@ export interface CalculoTecho {
 }
 
 const PLANCHA_3_8_AREA_M2 = PLANCHA_AREA_M2 // misma medida 1.22m x 2.44m que la de 1/2"
+const SEPARACION_CIELO_RASO_M = 0.40 // separación real de obra para techo interno, distinta a la de pared (0.406)
 
 // _tipoCubierta recibido del formulario, no altera cantidades de estructura
 export const calcularTecho = (
@@ -148,23 +149,26 @@ export const calcularTecho = (
                           Math.ceil((largo / Math.cos(angRad)) / LARGO_EFECT_CALAMINA)
 
   // Cielo raso interior: estructura propia e independiente de la cobertura exterior.
-  // Se calcula "como una pared horizontal" (separación 0.406m), usando el área
-  // total ancho x largo (sin restar vanos, el techo no lleva ventanas/puertas).
+  // Cada parante corre a lo largo del "largo" del ambiente, repetidos cada 0.40m
+  // a lo ancho. El riel va perpendicular, en piezas de 3m, cubriendo el ancho.
+  // (Confirmado con el boceto real de obra del usuario — separación exacta 0.40m,
+  // sin el +1 que sí usa la fórmula de pared.)
   let cieloRaso = {
     planchasCieloRaso: 0, parantesCieloRaso: 0, rielesCieloRaso: 0,
     cintaCieloRaso: 0, masillaCieloRaso: 0,
     tornillosPuntaFinaCieloRaso: 0, tornillosPuntaBrocaCieloRaso: 0,
   }
   if (incluyeCieloRaso) {
-    const posParantesCR = Math.floor(ancho / SEPARACION_PARANTE_M) + 1
+    const cantParantesCR = Math.ceil(largo / SEPARACION_CIELO_RASO_M)
+    const cantRielesCR   = 2 * Math.ceil(ancho / LARGO_PIEZA_M) // 2 extremos del largo, en piezas de 3m
     cieloRaso = {
       planchasCieloRaso: Math.ceil((area / PLANCHA_3_8_AREA_M2) * (1 + DESPERDICIO_PLANCHAS)),
-      parantesCieloRaso: posParantesCR,
-      rielesCieloRaso: Math.ceil(perimetro / LARGO_PIEZA_M),
-      cintaCieloRaso: Math.max(1, Math.ceil(((posParantesCR - 1) * largo * 1.1) / METROS_CINTA_ROLLO)),
+      parantesCieloRaso: cantParantesCR,
+      rielesCieloRaso: cantRielesCR,
+      cintaCieloRaso: Math.max(1, Math.ceil((cantParantesCR * ancho * 1.1) / METROS_CINTA_ROLLO)),
       masillaCieloRaso: Math.max(1, Math.ceil(area / M2_POR_BALDE_MASILLA)),
       tornillosPuntaFinaCieloRaso: Math.max(1, Math.ceil((area * TORNILLOS_FINOS_POR_M2) / 1000)),
-      tornillosPuntaBrocaCieloRaso: posParantesCR * 4,
+      tornillosPuntaBrocaCieloRaso: cantParantesCR * 4,
     }
   }
 
