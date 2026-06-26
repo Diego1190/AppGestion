@@ -159,16 +159,21 @@ export const calcularTecho = (
     tornillosPuntaFinaCieloRaso: 0, tornillosPuntaBrocaCieloRaso: 0,
   }
   if (incluyeCieloRaso) {
-    const cantParantesCR = Math.ceil(largo / SEPARACION_CIELO_RASO_M)
-    const cantRielesCR   = 2 * Math.ceil(ancho / LARGO_PIEZA_M) // 2 extremos del largo, en piezas de 3m
+    const lineasParanteCR = Math.ceil(largo / SEPARACION_CIELO_RASO_M)   // líneas de parante a lo largo, cada 0.40m
+    const piezasPorLineaCR = Math.ceil(ancho / LARGO_PIEZA_M)            // empalme si el parante (ancho) supera 3m
+    const cantParantesCR = lineasParanteCR * piezasPorLineaCR
+
+    const piezasPorRielCR = Math.ceil(largo / LARGO_PIEZA_M)             // empalme si el riel (largo) supera 3m
+    const cantRielesCR   = 2 * piezasPorRielCR                           // 2 extremos del ancho
+
     cieloRaso = {
       planchasCieloRaso: Math.ceil((area / PLANCHA_3_8_AREA_M2) * (1 + DESPERDICIO_PLANCHAS)),
       parantesCieloRaso: cantParantesCR,
       rielesCieloRaso: cantRielesCR,
-      cintaCieloRaso: Math.max(1, Math.ceil((cantParantesCR * ancho * 1.1) / METROS_CINTA_ROLLO)),
+      cintaCieloRaso: Math.max(1, Math.ceil((lineasParanteCR * ancho * 1.1) / METROS_CINTA_ROLLO)),
       masillaCieloRaso: Math.max(1, Math.ceil(area / M2_POR_BALDE_MASILLA)),
       tornillosPuntaFinaCieloRaso: Math.max(1, Math.ceil((area * TORNILLOS_FINOS_POR_M2) / 1000)),
-      tornillosPuntaBrocaCieloRaso: cantParantesCR * 4,
+      tornillosPuntaBrocaCieloRaso: lineasParanteCR * 4,
     }
   }
 

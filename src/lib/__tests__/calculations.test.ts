@@ -166,9 +166,16 @@ describe('calcularTecho', () => {
     const r = calcularTecho(4, 6, 'Calamina', 15, 0, true)
     expect(r.incluyeCieloRaso).toBe(true)
     expect(r.planchasCieloRaso).toBe(10) // ceil((24/2.977)*1.15)
-    expect(r.parantesCieloRaso).toBe(15) // ceil(largo/0.40) = ceil(6/0.40)
-    expect(r.rielesCieloRaso).toBe(4)    // 2 extremos x ceil(ancho/3) = 2*ceil(4/3)
+    expect(r.parantesCieloRaso).toBe(30) // 15 líneas (ceil(6/0.40)) x 2 piezas/línea (ceil(4/3), el ancho supera 3m y se empalma)
+    expect(r.rielesCieloRaso).toBe(4)    // 2 extremos x ceil(largo/3) = 2*ceil(6/3)
     expect(r.masillaCieloRaso).toBe(3)   // ceil(24/10)
+  })
+
+  it('si ancho y largo caben en una sola pieza de 3m, no hay empalme (1 pieza por línea/extremo)', () => {
+    const r = calcularTecho(2.5, 2.8, 'Calamina', 15, 0, true)
+    const lineasParante = Math.ceil(2.8 / 0.40) // 7
+    expect(r.parantesCieloRaso).toBe(lineasParante) // 1 pieza por línea, ancho=2.5m cabe en 3m
+    expect(r.rielesCieloRaso).toBe(2) // 1 pieza por extremo, largo=2.8m cabe en 3m
   })
 
   it('el cielo raso es independiente del riel/parante de la cobertura exterior (no se comparten)', () => {
@@ -180,10 +187,10 @@ describe('calcularTecho', () => {
     expect(r.parantesCieloRaso).toBeGreaterThan(0)
   })
 
-  it('caso de obra real: techo de 3m (ancho) x 5m (largo) da 13 parantes (verificado en boceto físico)', () => {
+  it('caso de obra real: techo de 3m (ancho) x 5m (largo) da 13 parantes y 4 rieles (verificado y confirmado por el usuario)', () => {
     const r = calcularTecho(3, 5, 'Calamina', 15, 0, true)
-    expect(r.parantesCieloRaso).toBe(13) // ceil(5/0.40) = ceil(12.5) = 13
-    expect(r.rielesCieloRaso).toBe(2)    // 2 extremos x ceil(3/3) = 2*1
+    expect(r.parantesCieloRaso).toBe(13) // ceil(5/0.40) = ceil(12.5) = 13, cada parante mide 3m (el ancho completo, sin empalme)
+    expect(r.rielesCieloRaso).toBe(4)    // 2 extremos x ceil(5/3) = 2*2, el riel se empalma porque el largo (5m) supera una pieza de 3m
   })
 
   it.each([
