@@ -84,7 +84,7 @@ const CrearCotizacionTab: React.FC = () => {
     largo:'', alto:'', caras:1, esquineros:0, medida:'64mm' as MedidaParante, tipoPlaca:'ST' as TipoPlaca, precio:45,
     puertas: [] as Vano[], ventanas: [] as Vano[],
   })
-  const [fTecho, setFTecho] = useState({ ancho:'', largo:'', cobertura:'Calamina', caida:15, canaletas:0, precio:55 })
+  const [fTecho, setFTecho] = useState({ ancho:'', largo:'', cobertura:'Calamina', caida:15, canaletas:0, incluyeCieloRaso:false, precio:55 })
   const [fMel,   setFMel]   = useState({ planchas:'', grosor:'18mm', acabado:'Blanco', acabadoCustom:'', cantosD:'', cantosG:'', correderas:0, bisagras:0, jaladores:0, precio:85 })
   const [fEsp,   setFEsp]   = useState({ tipo:'Pintura', m2:'', puntos:'', precio:15 })
 
@@ -221,15 +221,16 @@ const CrearCotizacionTab: React.FC = () => {
   const calcTechos = () => {
     if (!fTecho.ancho || !fTecho.largo) { addToast('Ingresa ancho y largo','error'); return }
     try {
-      const r = calcularTecho(parseFloat(fTecho.ancho), parseFloat(fTecho.largo), fTecho.cobertura, fTecho.caida, fTecho.canaletas)
+      const r = calcularTecho(parseFloat(fTecho.ancho), parseFloat(fTecho.largo), fTecho.cobertura, fTecho.caida, fTecho.canaletas, fTecho.incluyeCieloRaso)
       const area = parseFloat(r.area.toFixed(2))
+      const cieloRasoTxt = fTecho.incluyeCieloRaso ? ' + cielo raso' : ''
       agregarServicio(
-        `Techo ${fTecho.cobertura} — ${fTecho.ancho}m x ${fTecho.largo}m (${fTecho.caida}% pendiente)`,
+        `Techo ${fTecho.cobertura} — ${fTecho.ancho}m x ${fTecho.largo}m (${fTecho.caida}% pendiente)${cieloRasoTxt}`,
         area, 'm2', fTecho.precio,
         [...armarInsumosTecho(r, fTecho.cobertura, fTecho.canaletas), ...extrasDe('Techo')],
       )
-      addToast(`Area: ${area} m2 → ${r.calaminas} calaminas, ${r.perfilesOmega} omegas`,'success')
-      setFTecho(f => ({ ...f, ancho:'', largo:'', caida:15, canaletas:0 }))
+      addToast(`Area: ${area} m2 → ${r.calaminas} calaminas, ${r.perfilesOmega} omegas${fTecho.incluyeCieloRaso?`, ${r.planchasCieloRaso} planchas cielo raso`:''}`,'success')
+      setFTecho(f => ({ ...f, ancho:'', largo:'', caida:15, canaletas:0, incluyeCieloRaso:false }))
     } catch (err: any) { addToast(err.message,'error') }
   }
 
@@ -468,6 +469,12 @@ const CrearCotizacionTab: React.FC = () => {
               <div><label className="block text-[11px] font-medium mb-1">Canaletas ml</label><input type="number" min="0" className={inp} value={fTecho.canaletas||''} placeholder="0" onChange={e=>setFTecho({...fTecho,canaletas:parseInt(e.target.value)||0})}/></div>
               <div><label className="block text-[11px] font-medium mb-1 text-sky-600">Precio m2</label><input type="number" step="0.01" className={inp} value={fTecho.precio} onChange={e=>setFTecho({...fTecho,precio:parseFloat(e.target.value)||0})}/></div>
             </div>
+            <label className="flex items-center gap-2 mb-3 cursor-pointer bg-white rounded-lg border border-sky-200 px-3 py-2 w-fit">
+              <input type="checkbox" className="w-4 h-4 accent-sky-600" checked={fTecho.incluyeCieloRaso}
+                onChange={e=>setFTecho({...fTecho, incluyeCieloRaso:e.target.checked})}/>
+              <span className="text-sm font-medium text-sky-800">Incluye cielo raso (plancha 3/8" interior)</span>
+            </label>
+            {fTecho.ancho&&fTecho.largo&&(()=>{try{const r=calcularTecho(parseFloat(fTecho.ancho),parseFloat(fTecho.largo),fTecho.cobertura,fTecho.caida,fTecho.canaletas,fTecho.incluyeCieloRaso);return(<p className="text-xs text-sky-700 bg-sky-100 rounded px-3 py-1.5 mb-3">Area: <strong>{r.area.toFixed(2)} m2</strong> → {r.calaminas} {fTecho.cobertura.toLowerCase()} · {r.perfilesOmega} omegas{fTecho.incluyeCieloRaso&&<> · {r.planchasCieloRaso} planchas 3/8" cielo raso</>}</p>)}catch{return null}})()}
             <button onClick={calcTechos} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5"><Calculator className="w-4 h-4"/>Agregar Servicio</button>
           </div>
         )}

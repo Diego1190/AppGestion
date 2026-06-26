@@ -113,12 +113,24 @@ export interface CalculoTecho {
   tornillosHex: number        // tornillo hex 5/16", omega a estructura
   masillaSelladora: number    // tubo 300ml, crestas y bordes
   cintaAluminio: number       // rollo 50mm x 25m, perimetro y cumbrera
+  // ── Cielo raso interior (estructura independiente, opcional) ──
+  incluyeCieloRaso: boolean
+  planchasCieloRaso: number       // plancha drywall 3/8", misma medida 1.22x2.44
+  parantesCieloRaso: number       // separacion 0.406m, igual que pared
+  rielesCieloRaso: number         // perimetral, adicional al riel de la cobertura
+  cintaCieloRaso: number
+  masillaCieloRaso: number
+  tornillosPuntaFinaCieloRaso: number   // millares, fija la plancha
+  tornillosPuntaBrocaCieloRaso: number  // fija la estructura metalica entre si
 }
+
+const PLANCHA_3_8_AREA_M2 = PLANCHA_AREA_M2 // misma medida 1.22m x 2.44m que la de 1/2"
 
 // _tipoCubierta recibido del formulario, no altera cantidades de estructura
 export const calcularTecho = (
   ancho: number, largo: number, _tipoCubierta: string,
   caida = 15, canaletasMetros = 0,
+  incluyeCieloRaso = false,
 ): CalculoTecho => {
   if (ancho <= 0 || largo <= 0)
     throw new Error('Dimensiones invalidas')
@@ -135,6 +147,27 @@ export const calcularTecho = (
   const calaminas       = Math.ceil(ancho / ANCHO_EFECT_CALAMINA) *
                           Math.ceil((largo / Math.cos(angRad)) / LARGO_EFECT_CALAMINA)
 
+  // Cielo raso interior: estructura propia e independiente de la cobertura exterior.
+  // Se calcula "como una pared horizontal" (separación 0.406m), usando el área
+  // total ancho x largo (sin restar vanos, el techo no lleva ventanas/puertas).
+  let cieloRaso = {
+    planchasCieloRaso: 0, parantesCieloRaso: 0, rielesCieloRaso: 0,
+    cintaCieloRaso: 0, masillaCieloRaso: 0,
+    tornillosPuntaFinaCieloRaso: 0, tornillosPuntaBrocaCieloRaso: 0,
+  }
+  if (incluyeCieloRaso) {
+    const posParantesCR = Math.floor(ancho / SEPARACION_PARANTE_M) + 1
+    cieloRaso = {
+      planchasCieloRaso: Math.ceil((area / PLANCHA_3_8_AREA_M2) * (1 + DESPERDICIO_PLANCHAS)),
+      parantesCieloRaso: posParantesCR,
+      rielesCieloRaso: Math.ceil(perimetro / LARGO_PIEZA_M),
+      cintaCieloRaso: Math.max(1, Math.ceil(((posParantesCR - 1) * largo * 1.1) / METROS_CINTA_ROLLO)),
+      masillaCieloRaso: Math.max(1, Math.ceil(area / M2_POR_BALDE_MASILLA)),
+      tornillosPuntaFinaCieloRaso: Math.max(1, Math.ceil((area * TORNILLOS_FINOS_POR_M2) / 1000)),
+      tornillosPuntaBrocaCieloRaso: posParantesCR * 4,
+    }
+  }
+
   return {
     area, perfilesOmega, parantesT, rielestTecho, calaminas,
     canaletas: canaletasMetros,
@@ -143,6 +176,7 @@ export const calcularTecho = (
     tornillosHex:       perfilesOmega * 2,
     masillaSelladora:   Math.max(1, Math.ceil(calaminas / HOJAS_POR_TUBO_MASILLA)),
     cintaAluminio:      Math.max(1, Math.ceil((perimetro + ancho) / METROS_POR_ROLLO_CINTA)),
+    incluyeCieloRaso, ...cieloRaso,
   }
 }
 
@@ -247,7 +281,8 @@ export interface InsumoCalculado {
 
 // Precios referenciales de materiales (fuente única de verdad de precios sugeridos)
 export const PRECIOS_REF: Record<string, number> = {
-  'Plancha Drywall ST 1/2"':28.5, 'Plancha Drywall RH 1/2"':38.5, 'Parante 64mm (3m)':6, 'Riel 65mm (3m)':5.5,
+  'Plancha Drywall ST 1/2"':28.5, 'Plancha Drywall RH 1/2"':38.5, 'Plancha Drywall 3/8"':24,
+  'Parante 64mm (3m)':6, 'Riel 65mm (3m)':5.5,
   'Parante 38mm (3m)':5, 'Riel 39mm (3m)':4.5, 'Parante 89mm (3m)':8, 'Riel 90mm (3m)':7.5,
   'Esquinero Metalico 2.44m':3.5, 'Cinta de Papel 75m':8, 'Masilla Drywall 5kg':18,
   'Tornillos Punta Fina 1"':12, 'Tornillos Punta Broca 1/2"':0.05,
@@ -290,6 +325,16 @@ export const armarInsumosTecho = (r: CalculoTecho, cobertura: string, canaletasM
   { material_nombre:'Cinta Aluminio 50mmx25m', cantidad:r.cintaAluminio, unidad:'Rollo', precio_unitario:precioRef('Cinta Aluminio 50mmx25m'), es_manual:false },
   { material_nombre:'Anclajes (fulminante+clavo)', cantidad:r.anclajesEstructura, unidad:'Unid', precio_unitario:precioRef('Anclajes (fulminante+clavo)'), es_manual:false },
   ...(canaletasMetros>0?[{ material_nombre:'Canaleta Metalica', cantidad:canaletasMetros, unidad:'ml', precio_unitario:precioRef('Canaleta Metalica'), es_manual:false as const }]:[]),
+  // ── Cielo raso interior (estructura independiente, opcional) ──
+  ...(r.incluyeCieloRaso ? [
+    { material_nombre:'Plancha Drywall 3/8"', cantidad:r.planchasCieloRaso, unidad:'Unid', precio_unitario:precioRef('Plancha Drywall 3/8"'), es_manual:false as const },
+    { material_nombre:'Parante 64mm (3m)', cantidad:r.parantesCieloRaso, unidad:'Unid', precio_unitario:precioRef('Parante 64mm (3m)'), es_manual:false as const },
+    { material_nombre:'Riel 65mm (3m)', cantidad:r.rielesCieloRaso, unidad:'Unid', precio_unitario:precioRef('Riel 65mm (3m)'), es_manual:false as const },
+    { material_nombre:'Cinta de Papel 75m', cantidad:r.cintaCieloRaso, unidad:'Rollo', precio_unitario:precioRef('Cinta de Papel 75m'), es_manual:false as const },
+    { material_nombre:'Masilla Drywall 5kg', cantidad:r.masillaCieloRaso, unidad:'Balde', precio_unitario:precioRef('Masilla Drywall 5kg'), es_manual:false as const },
+    { material_nombre:'Tornillos Punta Fina 1"', cantidad:r.tornillosPuntaFinaCieloRaso, unidad:'Millar', precio_unitario:precioRef('Tornillos Punta Fina 1"'), es_manual:false as const },
+    { material_nombre:'Tornillos Punta Broca 1/2"', cantidad:r.tornillosPuntaBrocaCieloRaso, unidad:'Unid', precio_unitario:precioRef('Tornillos Punta Broca 1/2"'), es_manual:false as const },
+  ] : []),
 ]
 
 /** Datos del formulario de melamina necesarios para armar sus insumos */

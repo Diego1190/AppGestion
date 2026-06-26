@@ -155,6 +155,31 @@ describe('calcularTecho', () => {
     expect(muchaCaida.calaminas).toBeGreaterThanOrEqual(pocaCaida.calaminas)
   })
 
+  it('sin incluyeCieloRaso, no calcula ningún material de cielo raso (compatibilidad)', () => {
+    const r = calcularTecho(4, 6, 'Calamina', 15, 0)
+    expect(r.incluyeCieloRaso).toBe(false)
+    expect(r.planchasCieloRaso).toBe(0)
+    expect(r.parantesCieloRaso).toBe(0)
+  })
+
+  it('con incluyeCieloRaso=true, calcula la estructura de cielo raso usando el área total (sin restar vanos)', () => {
+    const r = calcularTecho(4, 6, 'Calamina', 15, 0, true)
+    expect(r.incluyeCieloRaso).toBe(true)
+    expect(r.planchasCieloRaso).toBe(10) // ceil((24/2.977)*1.15)
+    expect(r.parantesCieloRaso).toBe(10) // floor(4/0.406)+1
+    expect(r.rielesCieloRaso).toBe(7)    // ceil(perimetro/3) = ceil(20/3)
+    expect(r.masillaCieloRaso).toBe(3)   // ceil(24/10)
+  })
+
+  it('el cielo raso es independiente del riel/parante de la cobertura exterior (no se comparten)', () => {
+    const r = calcularTecho(4, 6, 'Calamina', 15, 0, true)
+    // ambos existen a la vez, con valores propios
+    expect(r.rielestTecho).toBeGreaterThan(0)
+    expect(r.rielesCieloRaso).toBeGreaterThan(0)
+    expect(r.parantesT).toBeGreaterThan(0)
+    expect(r.parantesCieloRaso).toBeGreaterThan(0)
+  })
+
   it.each([
     [0, 6],
     [4, 0],
@@ -254,6 +279,13 @@ describe('armarInsumosTecho', () => {
     const conCanaletas = armarInsumosTecho(r, 'Calamina', 12)
     expect(sinCanaletas.some(i => i.material_nombre === 'Canaleta Metalica')).toBe(false)
     expect(conCanaletas.some(i => i.material_nombre === 'Canaleta Metalica')).toBe(true)
+  })
+
+  it('incluye la plancha 3/8" del cielo raso solo cuando incluyeCieloRaso=true', () => {
+    const sinCieloRaso = armarInsumosTecho(calcularTecho(4, 6, 'Calamina', 15, 0, false), 'Calamina', 0)
+    const conCieloRaso = armarInsumosTecho(calcularTecho(4, 6, 'Calamina', 15, 0, true), 'Calamina', 0)
+    expect(sinCieloRaso.some(i => i.material_nombre === 'Plancha Drywall 3/8"')).toBe(false)
+    expect(conCieloRaso.some(i => i.material_nombre === 'Plancha Drywall 3/8"')).toBe(true)
   })
 })
 
