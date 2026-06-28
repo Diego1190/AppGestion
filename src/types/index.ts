@@ -105,6 +105,9 @@ export interface MaterialExtraServicio {
 export interface GastoPersonal {
   id: string
   concepto: string
+  /** Nota libre corta asociada al concepto (ej. "Plan 100MB", "N° de medidor").
+   *  Al volver a escribir el mismo concepto, se sugiere el último detalle usado. */
+  detalle?: string
   fecha_vencimiento: string
   monto: number
   estado: 'Pendiente' | 'Pagado'

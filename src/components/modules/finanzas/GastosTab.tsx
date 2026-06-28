@@ -24,7 +24,7 @@ const GastosTab: React.FC = () => {
   const [filtroMes,    setFiltroMes]    = useState(hoy.getMonth() + 1)
   const [filtroAnio,   setFiltroAnio]   = useState(hoy.getFullYear())
   const [filtroEstado, setFiltroEstado] = useState<'Todos'|'Pendiente'|'Pagado'>('Todos')
-  const [form, setForm] = useState({ concepto:'', fecha_vencimiento:'', monto:'', estado:'Pendiente' as 'Pendiente'|'Pagado', es_fijo:false })
+  const [form, setForm] = useState({ concepto:'', detalle:'', fecha_vencimiento:'', monto:'', estado:'Pendiente' as 'Pendiente'|'Pagado', es_fijo:false })
 
   const loadGastos = async () => {
     try { setLoading(true); setGastos(await getGastos()) }
@@ -62,7 +62,7 @@ const GastosTab: React.FC = () => {
       const fechaSugerida = new Date(g.fecha_vencimiento + 'T00:00:00')
       fechaSugerida.setMonth(fechaSugerida.getMonth() + 1) // mismo día, mes actual filtrado
       await createGasto({
-        concepto: g.concepto, monto: g.monto, estado: 'Pendiente',
+        concepto: g.concepto, detalle: g.detalle, monto: g.monto, estado: 'Pendiente',
         fecha_vencimiento: fechaSugerida.toISOString().split('T')[0],
         es_fijo: true,
       })
@@ -71,12 +71,21 @@ const GastosTab: React.FC = () => {
     } catch { addToast('Error agregando gasto fijo', 'error') }
   }
 
+  /** Último detalle usado para un concepto ya existente, ordenado por fecha más reciente.
+   *  Permite sugerir "Plan 100MB" automáticamente al volver a escribir "Celular". */
+  const ultimoDetallePorConcepto = (concepto: string): string | undefined => {
+    const coincidencias = gastos
+      .filter(g => g.concepto.trim().toLowerCase() === concepto.trim().toLowerCase() && g.detalle)
+      .sort((a, b) => new Date(b.fecha_vencimiento).getTime() - new Date(a.fecha_vencimiento).getTime())
+    return coincidencias[0]?.detalle
+  }
+
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editItem) return
     if (editItem.monto > MONTO_MAXIMO_RAZONABLE) { addToast(`El monto parece demasiado alto (más de S/ ${MONTO_MAXIMO_RAZONABLE}). Verifica que no sea un error de tecleo.`,'error'); return }
     try {
-      await updateGasto(editItem.id, { concepto: editItem.concepto, fecha_vencimiento: editItem.fecha_vencimiento, monto: editItem.monto, estado: editItem.estado, es_fijo: editItem.es_fijo })
+      await updateGasto(editItem.id, { concepto: editItem.concepto, detalle: editItem.detalle, fecha_vencimiento: editItem.fecha_vencimiento, monto: editItem.monto, estado: editItem.estado, es_fijo: editItem.es_fijo })
       setEditItem(null); addToast('Gasto actualizado','success'); loadGastos()
     } catch { addToast('Error actualizando','error') }
   }
@@ -86,8 +95,8 @@ const GastosTab: React.FC = () => {
     if (!form.monto || parseFloat(form.monto) <= 0) { addToast('Ingresa un monto válido','error'); return }
     if (parseFloat(form.monto) > MONTO_MAXIMO_RAZONABLE) { addToast(`El monto parece demasiado alto (más de S/ ${MONTO_MAXIMO_RAZONABLE}). Verifica que no sea un error de tecleo.`,'error'); return }
     try {
-      await createGasto({ concepto:form.concepto, fecha_vencimiento:form.fecha_vencimiento, monto:parseFloat(form.monto), estado:form.estado, es_fijo:form.es_fijo })
-      setForm({ concepto:'', fecha_vencimiento:'', monto:'', estado:'Pendiente', es_fijo:false })
+      await createGasto({ concepto:form.concepto, detalle:form.detalle||undefined, fecha_vencimiento:form.fecha_vencimiento, monto:parseFloat(form.monto), estado:form.estado, es_fijo:form.es_fijo })
+      setForm({ concepto:'', detalle:'', fecha_vencimiento:'', monto:'', estado:'Pendiente', es_fijo:false })
       setShowModal(false); addToast('Gasto registrado','success'); loadGastos()
     } catch (err: any) { addToast(err.message||'Error guardando','error') }
   }
@@ -188,6 +197,7 @@ const GastosTab: React.FC = () => {
                     {g.concepto}
                     {g.es_fijo && <Repeat className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" aria-label="Gasto fijo mensual"/>}
                   </p>
+                  {g.detalle && <p className="text-xs text-gray-400 mt-0.5">{g.detalle}</p>}
                   <p className={`text-sm mt-0.5 ${isVencido(g.fecha_vencimiento)&&g.estado==='Pendiente'?'text-red-600 font-medium':'text-gray-500'}`}>
                     Vence: {localDate(g.fecha_vencimiento)}
                     {isVencido(g.fecha_vencimiento)&&g.estado==='Pendiente'&&
@@ -219,6 +229,7 @@ const GastosTab: React.FC = () => {
           : <table className="w-full">
               <thead><tr className="bg-gray-50 border-b">
                 <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Concepto</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Detalle</th>
                 <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Vencimiento</th>
                 <th className="text-right px-4 py-3 text-sm font-semibold text-gray-700">Monto</th>
                 <th className="text-center px-4 py-3 text-sm font-semibold text-gray-700">Estado</th>
@@ -232,6 +243,7 @@ const GastosTab: React.FC = () => {
                       {g.es_fijo && <Repeat className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" aria-label="Gasto fijo mensual"/>}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{g.detalle || '—'}</td>
                   <td className="px-4 py-3 text-sm">
                     <span className={isVencido(g.fecha_vencimiento)&&g.estado==='Pendiente'?'text-red-600 font-medium':'text-gray-600'}>
                       {localDate(g.fecha_vencimiento)}
@@ -270,7 +282,17 @@ const GastosTab: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium mb-1.5">Concepto</label>
                 <input type="text" className={inp} placeholder="Ej: Internet, Colegio..."
-                  value={form.concepto} onChange={e=>setForm({...form,concepto:e.target.value})} required/>
+                  value={form.concepto}
+                  onChange={e=>{
+                    const nuevoConcepto = e.target.value
+                    const sugerido = ultimoDetallePorConcepto(nuevoConcepto)
+                    setForm(f => ({ ...f, concepto: nuevoConcepto, detalle: sugerido ?? f.detalle }))
+                  }} required/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Detalle <span className="text-gray-400 font-normal">opcional</span></label>
+                <input type="text" className={inp} placeholder="Ej: Plan 100MB, N° de medidor..."
+                  value={form.detalle} onChange={e=>setForm({...form,detalle:e.target.value})}/>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -319,6 +341,11 @@ const GastosTab: React.FC = () => {
                   <label className="block text-sm font-medium mb-1.5">Concepto</label>
                   <input type="text" className={inp} value={editItem.concepto}
                     onChange={e=>setEditItem({...editItem,concepto:e.target.value})} required/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Detalle <span className="text-gray-400 font-normal">opcional</span></label>
+                  <input type="text" className={inp} placeholder="Ej: Plan 100MB, N° de medidor..."
+                    value={editItem.detalle||''} onChange={e=>setEditItem({...editItem,detalle:e.target.value})}/>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
