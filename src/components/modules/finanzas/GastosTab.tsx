@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, CheckCircle, Clock, Pencil } from 'lucide-react'
+import { Plus, Trash2, CheckCircle, Clock, Pencil, Repeat, Sparkles } from 'lucide-react'
 import { getGastos, createGasto, updateGasto, deleteGasto } from '@/lib/finanzas'
 import { GastoPersonal } from '@/types/index'
 import { useToast, ToastContainer, ConfirmModal } from '@/components/Toast'
 import { Modal } from '@/components/ui/Modal'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
-import { MONTO_MAXIMO_RAZONABLE } from '@/lib/calculations'
+import { MONTO_MAXIMO_RAZONABLE, mesAnioAnterior } from '@/lib/calculations'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -24,7 +24,7 @@ const GastosTab: React.FC = () => {
   const [filtroMes,    setFiltroMes]    = useState(hoy.getMonth() + 1)
   const [filtroAnio,   setFiltroAnio]   = useState(hoy.getFullYear())
   const [filtroEstado, setFiltroEstado] = useState<'Todos'|'Pendiente'|'Pagado'>('Todos')
-  const [form, setForm] = useState({ concepto:'', fecha_vencimiento:'', monto:'', estado:'Pendiente' as 'Pendiente'|'Pagado' })
+  const [form, setForm] = useState({ concepto:'', fecha_vencimiento:'', monto:'', estado:'Pendiente' as 'Pendiente'|'Pagado', es_fijo:false })
 
   const loadGastos = async () => {
     try { setLoading(true); setGastos(await getGastos()) }
@@ -45,12 +45,38 @@ const GastosTab: React.FC = () => {
   const totalPagado    = gastosFiltrados.filter(g=>g.estado==='Pagado').reduce((s,g)=>s+g.monto,0)
   const isVencido = (f: string) => new Date(f+'T00:00:00') < new Date()
 
+  // Gastos marcados como fijos en el mes anterior, que todavía no se agregaron al mes/año
+  // actualmente filtrado. Solo se sugieren — el usuario decide si los agrega o no.
+  const fijosSugeridos = useMemo(() => {
+    const { mes: mesAnt, anio: anioAnt } = mesAnioAnterior(filtroMes, filtroAnio)
+    const fijosMesAnterior = gastos.filter(g => {
+      const f = new Date(g.fecha_vencimiento + 'T00:00:00')
+      return g.es_fijo && f.getMonth()+1 === mesAnt && f.getFullYear() === anioAnt
+    })
+    const conceptosEsteMes = new Set(gastosFiltrados.map(g => g.concepto.trim().toLowerCase()))
+    return fijosMesAnterior.filter(g => !conceptosEsteMes.has(g.concepto.trim().toLowerCase()))
+  }, [gastos, gastosFiltrados, filtroMes, filtroAnio])
+
+  const agregarFijoSugerido = async (g: GastoPersonal) => {
+    try {
+      const fechaSugerida = new Date(g.fecha_vencimiento + 'T00:00:00')
+      fechaSugerida.setMonth(fechaSugerida.getMonth() + 1) // mismo día, mes actual filtrado
+      await createGasto({
+        concepto: g.concepto, monto: g.monto, estado: 'Pendiente',
+        fecha_vencimiento: fechaSugerida.toISOString().split('T')[0],
+        es_fijo: true,
+      })
+      addToast(`"${g.concepto}" agregado a ${MESES[filtroMes-1]}`, 'success')
+      loadGastos()
+    } catch { addToast('Error agregando gasto fijo', 'error') }
+  }
+
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editItem) return
     if (editItem.monto > MONTO_MAXIMO_RAZONABLE) { addToast(`El monto parece demasiado alto (más de S/ ${MONTO_MAXIMO_RAZONABLE}). Verifica que no sea un error de tecleo.`,'error'); return }
     try {
-      await updateGasto(editItem.id, { concepto: editItem.concepto, fecha_vencimiento: editItem.fecha_vencimiento, monto: editItem.monto, estado: editItem.estado })
+      await updateGasto(editItem.id, { concepto: editItem.concepto, fecha_vencimiento: editItem.fecha_vencimiento, monto: editItem.monto, estado: editItem.estado, es_fijo: editItem.es_fijo })
       setEditItem(null); addToast('Gasto actualizado','success'); loadGastos()
     } catch { addToast('Error actualizando','error') }
   }
@@ -60,8 +86,8 @@ const GastosTab: React.FC = () => {
     if (!form.monto || parseFloat(form.monto) <= 0) { addToast('Ingresa un monto válido','error'); return }
     if (parseFloat(form.monto) > MONTO_MAXIMO_RAZONABLE) { addToast(`El monto parece demasiado alto (más de S/ ${MONTO_MAXIMO_RAZONABLE}). Verifica que no sea un error de tecleo.`,'error'); return }
     try {
-      await createGasto({ concepto:form.concepto, fecha_vencimiento:form.fecha_vencimiento, monto:parseFloat(form.monto), estado:form.estado })
-      setForm({ concepto:'', fecha_vencimiento:'', monto:'', estado:'Pendiente' })
+      await createGasto({ concepto:form.concepto, fecha_vencimiento:form.fecha_vencimiento, monto:parseFloat(form.monto), estado:form.estado, es_fijo:form.es_fijo })
+      setForm({ concepto:'', fecha_vencimiento:'', monto:'', estado:'Pendiente', es_fijo:false })
       setShowModal(false); addToast('Gasto registrado','success'); loadGastos()
     } catch (err: any) { addToast(err.message||'Error guardando','error') }
   }
@@ -128,6 +154,26 @@ const GastosTab: React.FC = () => {
         </button>
       </div>
 
+      {/* Sugerencia: gastos fijos del mes anterior que aún no están en el mes filtrado */}
+      {fijosSugeridos.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+          <p className="text-sm font-medium text-amber-800 flex items-center gap-1.5 mb-2">
+            <Sparkles className="w-4 h-4"/>Tienes {fijosSugeridos.length} gasto{fijosSugeridos.length!==1?'s':''} fijo{fijosSugeridos.length!==1?'s':''} pendiente{fijosSugeridos.length!==1?'s':''} de agregar a {MESES[filtroMes-1]}
+          </p>
+          <div className="space-y-1.5">
+            {fijosSugeridos.map(g => (
+              <div key={g.id} className="flex items-center justify-between gap-2 bg-white rounded-lg px-3 py-2 border border-amber-100">
+                <span className="text-sm text-gray-700">{g.concepto} <span className="text-gray-400">— S/ {g.monto.toFixed(2)}</span></span>
+                <button onClick={()=>agregarFijoSugerido(g)}
+                  className="text-xs px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium flex items-center gap-1 flex-shrink-0">
+                  <Plus className="w-3 h-3"/>Agregar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── MÓVIL: cards ── */}
       <div className="md:hidden space-y-2">
         {gastosFiltrados.length === 0
@@ -138,7 +184,10 @@ const GastosTab: React.FC = () => {
             <div key={g.id} className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900">{g.concepto}</p>
+                  <p className="font-semibold text-gray-900 flex items-center gap-1.5">
+                    {g.concepto}
+                    {g.es_fijo && <Repeat className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" aria-label="Gasto fijo mensual"/>}
+                  </p>
                   <p className={`text-sm mt-0.5 ${isVencido(g.fecha_vencimiento)&&g.estado==='Pendiente'?'text-red-600 font-medium':'text-gray-500'}`}>
                     Vence: {localDate(g.fecha_vencimiento)}
                     {isVencido(g.fecha_vencimiento)&&g.estado==='Pendiente'&&
@@ -177,7 +226,12 @@ const GastosTab: React.FC = () => {
               </tr></thead>
               <tbody>{gastosFiltrados.map(g=>(
                 <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900 text-sm">{g.concepto}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900 text-sm">
+                    <span className="flex items-center gap-1.5">
+                      {g.concepto}
+                      {g.es_fijo && <Repeat className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" aria-label="Gasto fijo mensual"/>}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     <span className={isVencido(g.fecha_vencimiento)&&g.estado==='Pendiente'?'text-red-600 font-medium':'text-gray-600'}>
                       {localDate(g.fecha_vencimiento)}
@@ -237,6 +291,11 @@ const GastosTab: React.FC = () => {
                   <option value="Pagado">Pagado</option>
                 </select>
               </div>
+              <label className="flex items-center gap-2 cursor-pointer bg-gray-50 rounded-lg px-3 py-2.5">
+                <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={form.es_fijo}
+                  onChange={e=>setForm({...form, es_fijo:e.target.checked})}/>
+                <span className="text-sm text-gray-700">Es un gasto fijo mensual (Internet, Colegio, etc.)</span>
+              </label>
             </div>
             <div className="px-5 py-4 border-t grid grid-cols-2 gap-3">
               <button type="button" onClick={()=>setShowModal(false)}
@@ -281,6 +340,11 @@ const GastosTab: React.FC = () => {
                     <option value="Pagado">Pagado</option>
                   </select>
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer bg-gray-50 rounded-lg px-3 py-2.5">
+                  <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={!!editItem.es_fijo}
+                    onChange={e=>setEditItem({...editItem, es_fijo:e.target.checked})}/>
+                  <span className="text-sm text-gray-700">Es un gasto fijo mensual</span>
+                </label>
               </div>
               <div className="px-5 py-4 border-t grid grid-cols-2 gap-3">
                 <button type="button" onClick={()=>setEditItem(null)}

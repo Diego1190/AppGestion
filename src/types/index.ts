@@ -108,6 +108,9 @@ export interface GastoPersonal {
   fecha_vencimiento: string
   monto: number
   estado: 'Pendiente' | 'Pagado'
+  /** Marca un gasto como recurrente mensual (ej. Internet, Colegio).
+   *  No se auto-crea solo: sirve para sugerir "agregar este mes también" con un clic. */
+  es_fijo?: boolean
 }
 
 export interface ControlVentaCasa {

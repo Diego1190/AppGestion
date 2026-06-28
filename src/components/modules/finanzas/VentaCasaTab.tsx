@@ -11,7 +11,7 @@ const TOTAL_VENTA = 20000
 
 type Hermano = 'Gabriel' | 'Fernando' | 'Tu'
 const HERMANOS: Hermano[] = ['Gabriel', 'Fernando', 'Tu']
-const LABEL: Record<Hermano, string> = { Gabriel: 'Gabriel', Fernando: 'Fernando', Tu: 'Tú' }
+const LABEL: Record<Hermano, string> = { Gabriel: 'Gabriel', Fernando: 'Fernando', Tu: 'Diego' }
 
 const COLORES: Record<Hermano, { bg: string; bar: string; text: string; badge: string }> = {
   Gabriel:  { bg: 'bg-blue-50',   bar: 'bg-blue-500',   text: 'text-blue-700',   badge: 'bg-blue-100 text-blue-800' },
@@ -349,7 +349,7 @@ const VentaCasaTab: React.FC = () => {
                     onChange={e=>setEditPago({...editPago,entregado_a:e.target.value})}>
                     <option value="Gabriel">Gabriel</option>
                     <option value="Fernando">Fernando</option>
-                    <option value="Tu">Tú</option>
+                    <option value="Tu">Diego</option>
                   </select>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
